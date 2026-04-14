@@ -26,6 +26,7 @@ model User {
   // Relations
   appointments    Appointment[]
   sessions        Session[]
+  evaluations     Evaluation[]
   
   @@index([clerkId])
   @@index([email])
@@ -57,6 +58,8 @@ model Patient {
   // Relations
   appointments    Appointment[]
   sessions        Session[]
+  clinicalHistory ClinicalHistory?
+  evaluations     Evaluation[]
   
   @@index([dni])
   @@index([email])
@@ -112,6 +115,11 @@ model Session {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   
+  // Evolution details
+  painLevel       Int?          // EVA scale 0-10
+  patientState    String?       @db.Text // Subjetivo del hoy
+  progressMetrics String?       @db.Text // Evaluacion corta
+  
   // Relations
   patient         Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
   professional    User          @relation(fields: [professionalId], references: [id])
@@ -120,4 +128,47 @@ model Session {
   @@index([patientId])
   @@index([professionalId])
   @@index([date])
+}
+
+// Clinical History
+model ClinicalHistory {
+  id                    String   @id @default(cuid())
+  patientId             String   @unique
+  reasonForConsultation String?  @db.Text
+  currentIllness        String?  @db.Text // Dolor, limitacion funcional, lesion
+  personalHistory       String?  @db.Text // Cirugias, previas, medicacion
+  familyHistory         String?  @db.Text
+  habits                String?  @db.Text // Actividad, trabajo, sedentarismo
+  alerts                String?  @db.Text // Alergias, contraindicaciones
+  kinesicDiagnosis      String?  @db.Text
+  treatmentGoals        String?  @db.Text // Objetivos a corto/largo plazo
+  treatmentPlan         String?  @db.Text // Frecuencia, terapias
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  patient               Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+// Evaluation / Re-evaluations
+model Evaluation {
+  id                String   @id @default(cuid())
+  patientId         String
+  professionalId    String
+  evalDate          DateTime @default(now())
+  type              String   // INIT, FOLLOW_UP, DISCHARGE
+  painScale         Int?     // EVA 0-10
+  subjective        String?  @db.Text
+  objectivePosture  String?  @db.Text
+  objectiveGait     String?  @db.Text
+  objectiveROM      String?  @db.Text
+  objectiveStrength String?  @db.Text
+  specialTests      String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  patient           Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  professional      User     @relation(fields: [professionalId], references: [id])
+  
+  @@index([patientId])
+  @@index([evalDate])
 }

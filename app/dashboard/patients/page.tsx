@@ -24,7 +24,7 @@ import { PatientForm } from "./patient-form";
 import { deletePatient, getPatients } from "./actions";
 import { formatDateShort } from "@/lib/utils";
 import { Patient } from "@prisma/client";
-import { Search, Plus, Pencil, Trash2, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Pencil, Trash2, Users, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -199,6 +199,14 @@ export default function PatientsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => router.push(`/dashboard/patients/${patient.id}/history`)}
+                        title="Abrir Historial Clínico"
+                      >
+                        <FileText className="h-4 w-4 text-primary" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"

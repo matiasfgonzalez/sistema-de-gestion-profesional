@@ -99,6 +99,9 @@ export async function createPatient(data: PatientFormValues) {
         address: validated.address || null,
         medicalHistory: validated.medicalHistory || null,
         observations: validated.observations || null,
+        clinicalHistory: {
+          create: {}
+        }
       },
     });
 
