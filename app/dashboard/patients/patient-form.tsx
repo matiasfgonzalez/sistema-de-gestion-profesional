@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { patientFormSchema, type PatientFormValues } from "@/lib/validations/patient";
@@ -74,6 +75,40 @@ export function PatientForm({ open, onOpenChange, patient }: PatientFormProps) {
           observations: "",
         },
   });
+
+  useEffect(() => {
+    if (open) {
+      if (patient) {
+        reset({
+          firstName: patient.firstName,
+          lastName: patient.lastName,
+          dni: patient.dni,
+          phone: patient.phone,
+          email: patient.email || "",
+          dateOfBirth: patient.dateOfBirth
+            ? new Date(patient.dateOfBirth).toISOString().split("T")[0]
+            : "",
+          gender: patient.gender || "",
+          address: patient.address || "",
+          medicalHistory: patient.medicalHistory || "",
+          observations: patient.observations || "",
+        });
+      } else {
+        reset({
+          firstName: "",
+          lastName: "",
+          dni: "",
+          phone: "",
+          email: "",
+          dateOfBirth: "",
+          gender: "",
+          address: "",
+          medicalHistory: "",
+          observations: "",
+        });
+      }
+    }
+  }, [open, patient, reset]);
 
   const onSubmit = async (data: PatientFormValues) => {
     try {

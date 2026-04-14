@@ -1,5 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { Role } from "@prisma/client";
 
 export type UserRole = "ADMIN" | "PROFESSIONAL";
 
@@ -13,19 +14,44 @@ export interface CurrentUser {
   role: UserRole;
 }
 
-export async function getCurrentUser(): Promise<CurrentUser | null> {
-  const { userId } = await auth();
+/**
+ * Ensure the Clerk user exists in our database.
+ * If not found, creates a new user record automatically.
+ */
+async function ensureUserExists(): Promise<CurrentUser> {
+  const { userId, sessionClaims } = await auth();
 
   if (!userId) {
-    return null;
+    throw new Error("Not authenticated");
   }
 
-  const user = await prisma.user.findUnique({
+  // Check if user exists
+  let user = await prisma.user.findUnique({
     where: { clerkId: userId },
   });
 
+  // If user doesn't exist, create it from Clerk data
   if (!user) {
-    return null;
+    const clerkUser = await currentUser();
+
+    if (!clerkUser) {
+      throw new Error("Failed to fetch user from Clerk");
+    }
+
+    // Extract role from Clerk metadata if available
+    const metadata = sessionClaims?.metadata as { role?: string } | undefined;
+    const role = metadata?.role === "ADMIN" ? Role.ADMIN : Role.PROFESSIONAL;
+
+    user = await prisma.user.create({
+      data: {
+        clerkId: userId,
+        email: clerkUser.emailAddresses[0]?.emailAddress ?? "",
+        firstName: clerkUser.firstName,
+        lastName: clerkUser.lastName,
+        imageUrl: clerkUser.imageUrl,
+        role,
+      },
+    });
   }
 
   return {
@@ -39,15 +65,23 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   };
 }
 
+export async function getCurrentUser(): Promise<CurrentUser | null> {
+  try {
+    return await ensureUserExists();
+  } catch {
+    return null;
+  }
+}
+
 export async function getCurrentUserOrThrow(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) {
-    throw new Error("User not found");
+    throw new Error("User not found or not authenticated");
   }
   return user;
 }
 
-export async function requireAdmin() {
+export async function requireAdmin(): Promise<CurrentUser> {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -62,8 +96,7 @@ export async function requireAdmin() {
 }
 
 /**
- * Sync user from Clerk to database
- * This should be called from webhook handlers
+ * Sync user from Clerk to database (for webhook handlers)
  */
 export async function syncUserFromClerk() {
   const user = await currentUser();
@@ -95,7 +128,7 @@ export async function syncUserFromClerk() {
       firstName: user.firstName,
       lastName: user.lastName,
       imageUrl: user.imageUrl,
-      role: "PROFESSIONAL",
+      role: Role.PROFESSIONAL,
     },
   });
 }
