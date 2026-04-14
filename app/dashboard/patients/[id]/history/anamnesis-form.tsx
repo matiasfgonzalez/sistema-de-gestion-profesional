@@ -1,15 +1,31 @@
-"use client";
+'use client';
 
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { clinicalHistorySchema, type ClinicalHistoryValues } from "@/lib/validations/clinical";
-import { updateClinicalHistory } from "./actions";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Save } from "lucide-react";
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  clinicalHistorySchema,
+  type ClinicalHistoryValues,
+} from '@/lib/validations/clinical';
+import { updateClinicalHistory } from './actions';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
+import {
+  Save,
+  AlertTriangle,
+  Stethoscope,
+  User,
+  Target,
+  ClipboardList,
+} from 'lucide-react';
 
 interface AnamnesisFormProps {
   patientId: string;
@@ -24,115 +40,266 @@ export function AnamnesisForm({ patientId, initialData }: AnamnesisFormProps) {
   } = useForm<ClinicalHistoryValues>({
     resolver: zodResolver(clinicalHistorySchema),
     defaultValues: {
-      reasonForConsultation: initialData.reasonForConsultation || "",
-      currentIllness: initialData.currentIllness || "",
-      personalHistory: initialData.personalHistory || "",
-      familyHistory: initialData.familyHistory || "",
-      habits: initialData.habits || "",
-      alerts: initialData.alerts || "",
-      kinesicDiagnosis: initialData.kinesicDiagnosis || "",
-      treatmentGoals: initialData.treatmentGoals || "",
-      treatmentPlan: initialData.treatmentPlan || "",
+      reasonForConsultation: initialData?.reasonForConsultation || '',
+      currentIllness: initialData?.currentIllness || '',
+      personalHistory: initialData?.personalHistory || '',
+      familyHistory: initialData?.familyHistory || '',
+      habits: initialData?.habits || '',
+      alerts: initialData?.alerts || '',
+      kinesicDiagnosis: initialData?.kinesicDiagnosis || '',
+      treatmentGoals: initialData?.treatmentGoals || '',
+      treatmentPlan: initialData?.treatmentPlan || '',
     },
   });
 
   const onSubmit = async (data: ClinicalHistoryValues) => {
     try {
       await updateClinicalHistory(patientId, data);
-      toast.success("Historial guardado exitosamente");
+      toast.success('Historial guardado exitosamente');
     } catch (error) {
-      toast.error("Error al guardar el historial");
+      toast.error('Error al guardar el historial');
     }
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      
-      {/* Alertas rojas */}
-      <Card className="border-danger-200 bg-danger-50 dark:bg-danger-950/20">
-        <CardContent className="pt-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pb-24">
+      {/* Alertas Médicas - Destacadas */}
+      <Card className="border-red-200 dark:border-red-900/50 bg-linear-to-br from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20 shadow-lg">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-red-500 flex items-center justify-center">
+              <AlertTriangle className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-red-900 dark:text-red-100">
+                Alertas Importantes
+              </CardTitle>
+              <CardDescription className="text-red-700 dark:text-red-300">
+                Alergias, contraindicaciones y riesgos médicos
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
           <div className="space-y-2">
-            <Label htmlFor="alerts" className="text-danger-800 dark:text-danger-400 font-bold">
-              Alertas Importantes (Alergias, Contraindicaciones, Riesgos)
+            <Label htmlFor="alerts" className="sr-only">
+              Alertas Importantes
             </Label>
-            <Textarea 
-              id="alerts" 
-              {...register("alerts")} 
-              placeholder="Ej: Alérgico al látex, marcapasos, hipertensión severa..." 
-              className="bg-background border-danger-200"
-              rows={2}
+            <Textarea
+              id="alerts"
+              {...register('alerts')}
+              placeholder="Ej: Alérgico al látex, marcapasos, hipertensión severa..."
+              className="bg-white dark:bg-neutral-900 border-red-200 dark:border-red-900/50 focus:border-red-500 dark:focus:border-red-500 min-h-20 resize-none"
+              rows={3}
             />
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Motivo y Enfermedad Actual</CardTitle>
-            <CardDescription>Exploración del dolor y la limitación</CardDescription>
+      {/* Motivo y Enfermedad Actual */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Stethoscope className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">
+                  Motivo y Enfermedad Actual
+                </CardTitle>
+                <CardDescription>
+                  Exploración del dolor y la limitación
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="reasonForConsultation">Motivo Principal de Consulta</Label>
-              <Textarea id="reasonForConsultation" {...register("reasonForConsultation")} rows={2} />
+              <Label
+                htmlFor="reasonForConsultation"
+                className="text-sm font-medium"
+              >
+                Motivo Principal de Consulta
+              </Label>
+              <Textarea
+                id="reasonForConsultation"
+                {...register('reasonForConsultation')}
+                placeholder="¿Por qué consulta el paciente?"
+                className="resize-none min-h-20"
+                rows={2}
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="currentIllness">Qué lo trae a tratamiento (Dolor, EVA, lesión específica)</Label>
-              <Textarea id="currentIllness" {...register("currentIllness")} rows={4} />
+              <Label htmlFor="currentIllness" className="text-sm font-medium">
+                Qué lo trae a tratamiento
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Dolor, EVA, lesión específica
+              </p>
+              <Textarea
+                id="currentIllness"
+                {...register('currentIllness')}
+                placeholder="Descripción detallada del problema actual..."
+                className="resize-none"
+                rows={4}
+              />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Antecedentes y Hábitos</CardTitle>
-            <CardDescription>Contexto previo del paciente</CardDescription>
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-accent/10 flex items-center justify-center">
+                <User className="h-5 w-5 text-accent" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">
+                  Antecedentes y Hábitos
+                </CardTitle>
+                <CardDescription>Contexto previo del paciente</CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="personalHistory">Personales (Cirugías, Medicación, Lesiones previas)</Label>
-              <Textarea id="personalHistory" {...register("personalHistory")} rows={2} />
+              <Label htmlFor="personalHistory" className="text-sm font-medium">
+                Personales
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Cirugías, medicación, lesiones previas
+              </p>
+              <Textarea
+                id="personalHistory"
+                {...register('personalHistory')}
+                placeholder="Ej: Operación de menisco en 2020..."
+                className="resize-none"
+                rows={2}
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="familyHistory">Familiares (Enfermedades relevantes)</Label>
-              <Textarea id="familyHistory" {...register("familyHistory")} rows={2} />
+              <Label htmlFor="familyHistory" className="text-sm font-medium">
+                Familiares
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Enfermedades relevantes
+              </p>
+              <Textarea
+                id="familyHistory"
+                {...register('familyHistory')}
+                placeholder="Ej: Diabetes, hipertensión familiar..."
+                className="resize-none"
+                rows={2}
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="habits">Hábitos (Trabajo, Deportes, Sedentarismo, Posturas)</Label>
-              <Textarea id="habits" {...register("habits")} rows={2} />
+              <Label htmlFor="habits" className="text-sm font-medium">
+                Hábitos
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Trabajo, deportes, sedentarismo, posturas
+              </p>
+              <Textarea
+                id="habits"
+                {...register('habits')}
+                placeholder="Ej: Trabaja 8hs sentado, practica running..."
+                className="resize-none"
+                rows={2}
+              />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
+      {/* Diagnóstico y Plan Kinésico */}
+      <Card className="shadow-sm hover:shadow-md transition-shadow">
         <CardHeader>
-          <CardTitle>Diagnóstico y Plan Kinésico</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="kinesicDiagnosis">Diagnóstico Kinésico Funcional</Label>
-            <Textarea id="kinesicDiagnosis" {...register("kinesicDiagnosis")} placeholder="Ej: Disfunción lumbar con restricción de movilidad..." rows={2} />
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+              <ClipboardList className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">
+                Diagnóstico y Plan Kinésico
+              </CardTitle>
+              <CardDescription>
+                Evaluación profesional y estrategia de tratamiento
+              </CardDescription>
+            </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-             <div className="space-y-2">
-                <Label htmlFor="treatmentGoals">Objetivos del Tratamiento (Corto / Largo plazo)</Label>
-                <Textarea id="treatmentGoals" {...register("treatmentGoals")} rows={3} />
-             </div>
-             <div className="space-y-2">
-                <Label htmlFor="treatmentPlan">Plan de Tratamiento (Técnicas, Frecuencia)</Label>
-                <Textarea id="treatmentPlan" {...register("treatmentPlan")} rows={3} />
-             </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="kinesicDiagnosis" className="text-sm font-medium">
+              Diagnóstico Kinésico Funcional
+            </Label>
+            <Textarea
+              id="kinesicDiagnosis"
+              {...register('kinesicDiagnosis')}
+              placeholder="Ej: Disfunción lumbar con restricción de movilidad..."
+              className="resize-none"
+              rows={3}
+            />
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="h-4 w-4 text-primary" />
+                <Label htmlFor="treatmentGoals" className="text-sm font-medium">
+                  Objetivos del Tratamiento
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground mb-2">
+                Metas a corto y largo plazo
+              </p>
+              <Textarea
+                id="treatmentGoals"
+                {...register('treatmentGoals')}
+                placeholder="Ej: Reducir dolor, mejorar movilidad..."
+                className="resize-none"
+                rows={4}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 mb-2">
+                <Stethoscope className="h-4 w-4 text-primary" />
+                <Label htmlFor="treatmentPlan" className="text-sm font-medium">
+                  Plan de Tratamiento
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground mb-2">
+                Técnicas y frecuencia
+              </p>
+              <Textarea
+                id="treatmentPlan"
+                {...register('treatmentPlan')}
+                placeholder="Ej: 2 sesiones semanales, magnetoterapia..."
+                className="resize-none"
+                rows={4}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="flex justify-end sticky bottom-6 z-10 w-full py-4 bg-background/80 backdrop-blur-sm border-t border-border">
-        <Button type="submit" disabled={isSubmitting} size="lg">
-          <Save className="w-4 h-4 mr-2" />
-          {isSubmitting ? "Guardando..." : "Guardar Historial Clínico"}
-        </Button>
+      {/* Botón Guardar - Sticky Footer */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-background/95 backdrop-blur-lg shadow-lg">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-end max-w-7xl mx-auto">
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              size="lg"
+              className="min-w-48 shadow-lg"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {isSubmitting ? 'Guardando...' : 'Guardar Historial Clínico'}
+            </Button>
+          </div>
+        </div>
       </div>
     </form>
   );
