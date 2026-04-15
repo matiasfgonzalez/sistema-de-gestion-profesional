@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { appointmentFormSchema, type AppointmentFormValues } from "@/lib/validations/appointment";
-import { getCurrentUserOrThrow } from "@/lib/auth";
+import { assertCanAccessOwnedResource, getCurrentUserOrThrow, isAdmin } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
 
 async function assertActivePatient(patientId: string) {
@@ -52,7 +52,7 @@ export async function getAppointments(search?: string, page: number = 1, limit: 
     const user = await getCurrentUserOrThrow();
 
     const where: Prisma.AppointmentWhereInput = {
-      professionalId: user.id,
+      ...(isAdmin(user) ? {} : { professionalId: user.id }),
       ...(search && {
         OR: [
           { patient: { firstName: { contains: search, mode: Prisma.QueryMode.insensitive } } },
@@ -102,10 +102,10 @@ export async function getAppointmentById(id: string) {
   try {
     const user = await getCurrentUserOrThrow();
 
-    const appointment = await prisma.appointment.findUnique({
+    const appointment = await prisma.appointment.findFirst({
       where: {
         id,
-        professionalId: user.id,
+        ...(isAdmin(user) ? {} : { professionalId: user.id }),
       },
       include: {
         patient: {
@@ -182,9 +182,15 @@ export async function updateAppointment(id: string, data: AppointmentFormValues)
       where: { id },
     });
 
-    if (!existing || existing.professionalId !== user.id) {
-      throw new Error("No puedes editar este turno");
+    if (!existing) {
+      throw new Error("Turno no encontrado");
     }
+
+    assertCanAccessOwnedResource(
+      user,
+      existing.professionalId,
+      "No puedes editar este turno"
+    );
 
     const appointmentDate = new Date(validated.date);
     await assertActivePatient(validated.patientId);
@@ -228,9 +234,15 @@ export async function deleteAppointment(id: string) {
       where: { id },
     });
 
-    if (!existing || existing.professionalId !== user.id) {
-      throw new Error("No tienes permiso para eliminar este turno");
+    if (!existing) {
+      throw new Error("Turno no encontrado");
     }
+
+    assertCanAccessOwnedResource(
+      user,
+      existing.professionalId,
+      "No tienes permiso para eliminar este turno"
+    );
 
     const res = await prisma.appointment.delete({
       where: { id },
@@ -273,7 +285,7 @@ export async function getAppointmentsByDateRange(startDate: string, endDate: str
 
     const appointments = await prisma.appointment.findMany({
       where: {
-        professionalId: user.id,
+        ...(isAdmin(user) ? {} : { professionalId: user.id }),
         date: {
           gte: new Date(startDate),
           lte: new Date(endDate),

@@ -21,6 +21,10 @@ export function canAccessOwnedResource(
   return user.role === "ADMIN" || user.id === ownerId;
 }
 
+export function isAdmin(user: Pick<CurrentUser, "role">): boolean {
+  return user.role === "ADMIN";
+}
+
 export function assertCanAccessOwnedResource(
   user: Pick<CurrentUser, "id" | "role">,
   ownerId: string,

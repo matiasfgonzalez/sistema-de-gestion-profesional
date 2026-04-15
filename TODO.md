@@ -23,7 +23,7 @@ Cada paciente avanza por un flujo asistencial trazable: registro administrativo 
 - [x] Reemplazar la "edicion por delete+create" de evaluaciones/sesiones:
   - crear `updateEvaluation` y `updateSession` reales.
   - preservar trazabilidad, IDs e historial temporal.
-- [ ] Estandarizar reglas RBAC en todo el dashboard:
+- [x] Estandarizar reglas RBAC en todo el dashboard:
   - alinear comportamiento real con lo prometido en README.
   - consolidar proteccion por rol en middleware + server actions.
 
