@@ -14,6 +14,23 @@ export interface CurrentUser {
   role: UserRole;
 }
 
+export function canAccessOwnedResource(
+  user: Pick<CurrentUser, "id" | "role">,
+  ownerId: string
+): boolean {
+  return user.role === "ADMIN" || user.id === ownerId;
+}
+
+export function assertCanAccessOwnedResource(
+  user: Pick<CurrentUser, "id" | "role">,
+  ownerId: string,
+  forbiddenMessage = "No tienes permiso para realizar esta acción"
+) {
+  if (!canAccessOwnedResource(user, ownerId)) {
+    throw new Error(forbiddenMessage);
+  }
+}
+
 /**
  * Ensure the Clerk user exists in our database.
  * If not found, creates a new user record automatically.

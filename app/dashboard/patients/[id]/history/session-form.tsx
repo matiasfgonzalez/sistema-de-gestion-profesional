@@ -5,9 +5,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   sessionEvolutionSchema,
+  type SessionEvolutionFormInput,
   type SessionEvolutionValues,
 } from '@/lib/validations/clinical';
-import { createSession, deleteSession } from './actions';
+import { createSession, deleteSession, updateSession } from './actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,7 +44,7 @@ export function SessionForm({
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
-  } = useForm<SessionEvolutionValues>({
+  } = useForm<SessionEvolutionFormInput, unknown, SessionEvolutionValues>({
     resolver: zodResolver(sessionEvolutionSchema),
     defaultValues: {
       date: new Date().toISOString().split('T')[0],
@@ -89,8 +90,7 @@ export function SessionForm({
   const onSubmit = async (data: SessionEvolutionValues) => {
     try {
       if (isEditing) {
-        await deleteSession(sessionInfo.id, patientId);
-        await createSession(patientId, data);
+        await updateSession(sessionInfo.id, patientId, data);
         toast.success('Sesión actualizada correctamente');
       } else {
         await createSession(patientId, data);

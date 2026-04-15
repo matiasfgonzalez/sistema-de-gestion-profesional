@@ -5,9 +5,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   evaluationSchema,
+  type EvaluationFormInput,
   type EvaluationValues,
 } from '@/lib/validations/clinical';
-import { createEvaluation, deleteEvaluation } from './actions';
+import { createEvaluation, deleteEvaluation, updateEvaluation } from './actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,7 +53,7 @@ export function EvaluationForm({
     setValue,
     watch,
     reset,
-  } = useForm<EvaluationValues>({
+  } = useForm<EvaluationFormInput, unknown, EvaluationValues>({
     resolver: zodResolver(evaluationSchema),
     defaultValues: {
       type: 'FOLLOW_UP',
@@ -97,11 +98,7 @@ export function EvaluationForm({
   const onSubmit = async (data: EvaluationValues) => {
     try {
       if (isEditing) {
-        // En este MVP la reescribimos borrando la vieja y subiendo nueva si está editando para simplificar.
-        // O mejor simplemente evitamos edición compleja de historiales para evitar fraude médico, pero permitimos crear.
-        // Asumiendo que es read-only la edición en apps medicas estrictas, pero aquí damos flexibilidad.
-        await deleteEvaluation(evaluation.id, patientId);
-        await createEvaluation(patientId, data);
+        await updateEvaluation(evaluation.id, patientId, data);
         toast.success('Evaluación actualizada correctamente');
       } else {
         await createEvaluation(patientId, data);
@@ -154,7 +151,9 @@ export function EvaluationForm({
               </Label>
               <Select
                 value={watch('type')}
-                onValueChange={(val: any) => setValue('type', val)}
+                onValueChange={(val) =>
+                  setValue('type', val as NonNullable<EvaluationFormInput['type']>)
+                }
               >
                 <SelectTrigger className="h-11">
                   <SelectValue placeholder="Seleccionar tipo" />

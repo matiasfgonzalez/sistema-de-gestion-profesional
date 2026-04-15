@@ -25,7 +25,8 @@ export const evaluationSchema = z.object({
   specialTests: z.string().optional().or(z.literal("")),
 });
 
-export type EvaluationValues = z.infer<typeof evaluationSchema>;
+export type EvaluationFormInput = z.input<typeof evaluationSchema>;
+export type EvaluationValues = z.output<typeof evaluationSchema>;
 
 export const sessionEvolutionSchema = z.object({
   appointmentId: z.string().optional(),
@@ -39,4 +40,5 @@ export const sessionEvolutionSchema = z.object({
   notes: z.string().optional().or(z.literal("")),
 });
 
-export type SessionEvolutionValues = z.infer<typeof sessionEvolutionSchema>;
+export type SessionEvolutionFormInput = z.input<typeof sessionEvolutionSchema>;
+export type SessionEvolutionValues = z.output<typeof sessionEvolutionSchema>;

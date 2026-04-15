@@ -6,6 +6,47 @@ import { appointmentFormSchema, type AppointmentFormValues } from "@/lib/validat
 import { getCurrentUserOrThrow } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
 
+async function assertActivePatient(patientId: string) {
+  const patient = await prisma.patient.findUnique({
+    where: { id: patientId, isActive: true },
+    select: { id: true },
+  });
+
+  if (!patient) {
+    throw new Error("El paciente seleccionado no existe o está inactivo");
+  }
+}
+
+async function assertNoOverlappingAppointment(params: {
+  professionalId: string;
+  date: Date;
+  startTime: string;
+  endTime: string;
+  ignoreAppointmentId?: string;
+}) {
+  const overlappingAppointment = await prisma.appointment.findFirst({
+    where: {
+      professionalId: params.professionalId,
+      date: params.date,
+      id: params.ignoreAppointmentId ? { not: params.ignoreAppointmentId } : undefined,
+      status: {
+        notIn: ["CANCELLED", "NO_SHOW"],
+      },
+      startTime: {
+        lt: params.endTime,
+      },
+      endTime: {
+        gt: params.startTime,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (overlappingAppointment) {
+    throw new Error("Existe un turno superpuesto para ese horario");
+  }
+}
+
 export async function getAppointments(search?: string, page: number = 1, limit: number = 10) {
   try {
     const user = await getCurrentUserOrThrow();
@@ -96,21 +137,21 @@ export async function createAppointment(data: AppointmentFormValues) {
     const user = await getCurrentUserOrThrow();
 
     const validated = appointmentFormSchema.parse(data);
+    const appointmentDate = new Date(validated.date);
 
-    // Validate that the patient component is active and assigned
-    const patientExists = await prisma.patient.findUnique({
-      where: { id: validated.patientId, isActive: true },
+    await assertActivePatient(validated.patientId);
+    await assertNoOverlappingAppointment({
+      professionalId: user.id,
+      date: appointmentDate,
+      startTime: validated.startTime,
+      endTime: validated.endTime,
     });
-
-    if (!patientExists) {
-      throw new Error("El paciente seleccionado no existe o está inactivo");
-    }
 
     const appointment = await prisma.appointment.create({
       data: {
         patientId: validated.patientId,
         professionalId: user.id,
-        date: new Date(validated.date),
+        date: appointmentDate,
         startTime: validated.startTime,
         endTime: validated.endTime,
         status: validated.status,
@@ -145,11 +186,21 @@ export async function updateAppointment(id: string, data: AppointmentFormValues)
       throw new Error("No puedes editar este turno");
     }
 
+    const appointmentDate = new Date(validated.date);
+    await assertActivePatient(validated.patientId);
+    await assertNoOverlappingAppointment({
+      professionalId: user.id,
+      date: appointmentDate,
+      startTime: validated.startTime,
+      endTime: validated.endTime,
+      ignoreAppointmentId: id,
+    });
+
     const appointment = await prisma.appointment.update({
       where: { id },
       data: {
         patientId: validated.patientId,
-        date: new Date(validated.date),
+        date: appointmentDate,
         startTime: validated.startTime,
         endTime: validated.endTime,
         status: validated.status,
