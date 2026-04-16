@@ -14,20 +14,25 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EvaluationForm } from './evaluation-form';
+import type { EvaluationRecord } from './types';
 
 interface EvaluationsTabProps {
   patientId: string;
-  evaluations: any[]; // Prisma Evaluation Type
+  episodeId?: string | null;
+  episodeTitle?: string | null;
+  evaluations: EvaluationRecord[];
 }
 
 export function EvaluationsTab({
   patientId,
+  episodeId,
+  episodeTitle,
   evaluations,
 }: EvaluationsTabProps) {
   const [formOpen, setFormOpen] = useState(false);
-  const [selectedEval, setSelectedEval] = useState<any | null>(null);
+  const [selectedEval, setSelectedEval] = useState<EvaluationRecord | null>(null);
 
-  const handleOpenForm = (evaluation?: any) => {
+  const handleOpenForm = (evaluation?: EvaluationRecord) => {
     setSelectedEval(evaluation || null);
     setFormOpen(true);
   };
@@ -93,11 +98,18 @@ export function EvaluationsTab({
           onClick={() => handleOpenForm()}
           size="lg"
           className="shadow-md"
+          disabled={!episodeId}
         >
           <Plus className="w-4 h-4 mr-2" />
           Nueva Evaluación
         </Button>
       </div>
+
+      {episodeTitle && (
+        <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+          Episodio activo: <span className="font-medium text-foreground">{episodeTitle}</span>
+        </div>
+      )}
 
       {/* Empty State */}
       {evaluations.length === 0 ? (
@@ -107,13 +119,16 @@ export function EvaluationsTab({
               <Activity className="h-8 w-8 text-muted-foreground/50" />
             </div>
             <h3 className="text-lg font-semibold text-foreground mb-2">
-              Sin evaluaciones registradas
+              {episodeId
+                ? 'Sin evaluaciones registradas para este episodio'
+                : 'Selecciona un episodio clínico'}
             </h3>
             <p className="text-sm text-muted-foreground mb-6 max-w-sm">
-              Comienza a documentar el progreso del paciente con evaluaciones
-              médicas periódicas
+              {episodeId
+                ? 'Comienza a documentar el progreso del episodio con evaluaciones médicas periódicas'
+                : 'Debes seleccionar o crear un episodio antes de registrar evaluaciones'}
             </p>
-            <Button onClick={() => handleOpenForm()} variant="outline">
+            <Button onClick={() => handleOpenForm()} variant="outline" disabled={!episodeId}>
               <Plus className="w-4 h-4 mr-2" />
               Crear primera evaluación
             </Button>
@@ -158,7 +173,7 @@ export function EvaluationsTab({
                                 )}
                               </div>
                               <Badge
-                                variant={getBadgeVariant(ev.type) as any}
+                                variant={getBadgeVariant(ev.type) as 'default' | 'secondary' | 'outline'}
                                 className="text-xs"
                               >
                                 {getTypeName(ev.type)}
@@ -275,6 +290,7 @@ export function EvaluationsTab({
         open={formOpen}
         onOpenChange={setFormOpen}
         patientId={patientId}
+        episodeId={episodeId ?? ''}
         evaluation={selectedEval}
       />
     </div>

@@ -5,9 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { assertCanAccessOwnedResource, getCurrentUserOrThrow } from "@/lib/auth";
 import { 
   clinicalHistorySchema, type ClinicalHistoryValues,
+  careEpisodeSchema, type CareEpisodeValues,
   evaluationSchema, type EvaluationValues,
   sessionEvolutionSchema, type SessionEvolutionValues 
 } from "@/lib/validations/clinical";
+import { CareEpisodeStatus } from "@prisma/client";
 
 async function assertPatientExistsAndActive(patientId: string) {
   const patient = await prisma.patient.findUnique({
@@ -18,6 +20,27 @@ async function assertPatientExistsAndActive(patientId: string) {
   if (!patient) {
     throw new Error("El paciente no existe o está inactivo");
   }
+}
+
+async function assertEpisodeBelongsToPatient(episodeId: string, patientId: string) {
+  const episode = await prisma.careEpisode.findUnique({
+    where: { id: episodeId },
+    select: {
+      id: true,
+      patientId: true,
+      status: true,
+    },
+  });
+
+  if (!episode) {
+    throw new Error("El episodio clínico no existe");
+  }
+
+  if (episode.patientId !== patientId) {
+    throw new Error("El episodio no corresponde al paciente seleccionado");
+  }
+
+  return episode;
 }
 
 export async function getClinicalHistory(patientId: string) {
@@ -67,14 +90,158 @@ export async function updateClinicalHistory(patientId: string, data: ClinicalHis
   }
 }
 
-export async function getEvaluations(patientId: string) {
+export async function getCareEpisodes(patientId: string) {
+  try {
+    await getCurrentUserOrThrow();
+    await assertPatientExistsAndActive(patientId);
+
+    return await prisma.careEpisode.findMany({
+      where: { patientId },
+      include: {
+        _count: {
+          select: {
+            evaluations: true,
+            sessions: true,
+          },
+        },
+      },
+      orderBy: [{ status: "asc" }, { startDate: "desc" }, { createdAt: "desc" }],
+    });
+  } catch (error) {
+    console.error("[getCareEpisodes] Error:", error);
+    throw new Error("Error al obtener los episodios clínicos");
+  }
+}
+
+export async function createCareEpisode(patientId: string, data: CareEpisodeValues) {
+  try {
+    await getCurrentUserOrThrow();
+    await assertPatientExistsAndActive(patientId);
+
+    const validated = careEpisodeSchema.parse(data);
+
+    const episode = await prisma.careEpisode.create({
+      data: {
+        patientId,
+        title: validated.title,
+        focusArea: validated.focusArea || null,
+        startDate: new Date(validated.startDate),
+        endDate: validated.endDate ? new Date(validated.endDate) : null,
+        status: validated.status,
+        chiefComplaint: validated.chiefComplaint || null,
+        currentCondition: validated.currentCondition || null,
+        kinesicDiagnosis: validated.kinesicDiagnosis || null,
+        treatmentGoals: validated.treatmentGoals || null,
+        treatmentPlan: validated.treatmentPlan || null,
+        dischargeSummary: validated.dischargeSummary || null,
+      },
+    });
+
+    revalidatePath(`/dashboard/patients/${patientId}/history`);
+    return episode;
+  } catch (error) {
+    console.error("[createCareEpisode] Error:", error);
+    throw new Error("Error al crear el episodio clínico");
+  }
+}
+
+export async function updateCareEpisode(id: string, patientId: string, data: CareEpisodeValues) {
+  try {
+    await getCurrentUserOrThrow();
+    await assertPatientExistsAndActive(patientId);
+    await assertEpisodeBelongsToPatient(id, patientId);
+
+    const validated = careEpisodeSchema.parse(data);
+
+    const episode = await prisma.careEpisode.update({
+      where: { id },
+      data: {
+        title: validated.title,
+        focusArea: validated.focusArea || null,
+        startDate: new Date(validated.startDate),
+        endDate: validated.endDate ? new Date(validated.endDate) : null,
+        status: validated.status,
+        chiefComplaint: validated.chiefComplaint || null,
+        currentCondition: validated.currentCondition || null,
+        kinesicDiagnosis: validated.kinesicDiagnosis || null,
+        treatmentGoals: validated.treatmentGoals || null,
+        treatmentPlan: validated.treatmentPlan || null,
+        dischargeSummary: validated.dischargeSummary || null,
+      },
+    });
+
+    revalidatePath(`/dashboard/patients/${patientId}/history`);
+    return episode;
+  } catch (error) {
+    console.error("[updateCareEpisode] Error:", error);
+    throw new Error("Error al actualizar el episodio clínico");
+  }
+}
+
+export async function getEpisodeWorkflowSummary(episodeId: string, patientId: string) {
+  try {
+    await getCurrentUserOrThrow();
+    const episode = await assertEpisodeBelongsToPatient(episodeId, patientId);
+
+    const [evaluations, sessions] = await Promise.all([
+      prisma.evaluation.findMany({
+        where: { episodeId },
+        select: { type: true },
+      }),
+      prisma.session.count({
+        where: { episodeId },
+      }),
+    ]);
+
+    const hasInitialEvaluation = evaluations.some((item) => item.type === "INIT");
+    const hasFollowUpEvaluation = evaluations.some((item) => item.type === "FOLLOW_UP");
+    const hasDischargeEvaluation = evaluations.some((item) => item.type === "DISCHARGE");
+    const hasPlan =
+      Boolean(episode.kinesicDiagnosis?.trim()) &&
+      Boolean(episode.treatmentGoals?.trim()) &&
+      Boolean(episode.treatmentPlan?.trim());
+
+    let currentStage =
+      "Evaluación inicial pendiente";
+
+    if (episode.status === CareEpisodeStatus.DISCHARGED || hasDischargeEvaluation) {
+      currentStage = "Alta";
+    } else if (hasFollowUpEvaluation) {
+      currentStage = "Reevaluación";
+    } else if (sessions > 0) {
+      currentStage = "Sesiones en curso";
+    } else if (hasPlan) {
+      currentStage = "Plan terapéutico definido";
+    } else if (hasInitialEvaluation) {
+      currentStage = "Plan terapéutico pendiente";
+    }
+
+    return {
+      hasInitialEvaluation,
+      hasPlan,
+      sessionsCount: sessions,
+      hasFollowUpEvaluation,
+      hasDischargeEvaluation,
+      currentStage,
+    };
+  } catch (error) {
+    console.error("[getEpisodeWorkflowSummary] Error:", error);
+    throw new Error("Error al obtener el flujo del episodio");
+  }
+}
+
+export async function getEvaluations(patientId: string, episodeId?: string) {
   try {
     const user = await getCurrentUserOrThrow();
     await assertPatientExistsAndActive(patientId);
+    if (episodeId) {
+      await assertEpisodeBelongsToPatient(episodeId, patientId);
+    }
 
     const evaluations = await prisma.evaluation.findMany({
       where: { 
         patientId,
+        ...(episodeId ? { episodeId } : {}),
         ...(user.role === "ADMIN" ? {} : { professionalId: user.id }),
       },
       orderBy: { evalDate: "desc" },
@@ -87,16 +254,22 @@ export async function getEvaluations(patientId: string) {
   }
 }
 
-export async function createEvaluation(patientId: string, data: EvaluationValues) {
+export async function createEvaluation(patientId: string, episodeId: string, data: EvaluationValues) {
   try {
     const user = await getCurrentUserOrThrow();
     await assertPatientExistsAndActive(patientId);
+    const episode = await assertEpisodeBelongsToPatient(episodeId, patientId);
+
+    if (episode.status === CareEpisodeStatus.DISCHARGED) {
+      throw new Error("No se pueden registrar evaluaciones en un episodio dado de alta");
+    }
 
     const validated = evaluationSchema.parse(data);
 
     const evaluation = await prisma.evaluation.create({
       data: {
         patientId,
+        episodeId,
         professionalId: user.id,
         ...validated,
         painScale: validated.painScale !== "" ? Number(validated.painScale) : null,
@@ -111,16 +284,18 @@ export async function createEvaluation(patientId: string, data: EvaluationValues
   }
 }
 
-export async function updateEvaluation(id: string, patientId: string, data: EvaluationValues) {
+export async function updateEvaluation(id: string, patientId: string, episodeId: string, data: EvaluationValues) {
   try {
     const user = await getCurrentUserOrThrow();
     await assertPatientExistsAndActive(patientId);
+    const episode = await assertEpisodeBelongsToPatient(episodeId, patientId);
 
     const existing = await prisma.evaluation.findUnique({
       where: { id },
       select: {
         id: true,
         patientId: true,
+        episodeId: true,
         professionalId: true,
       },
     });
@@ -133,17 +308,26 @@ export async function updateEvaluation(id: string, patientId: string, data: Eval
       throw new Error("La evaluación no corresponde al paciente seleccionado");
     }
 
+    if (existing.episodeId !== episodeId) {
+      throw new Error("La evaluación no corresponde al episodio seleccionado");
+    }
+
     assertCanAccessOwnedResource(
       user,
       existing.professionalId,
       "No tienes permiso para editar esta evaluación"
     );
 
+    if (episode.status === CareEpisodeStatus.DISCHARGED) {
+      throw new Error("No se pueden editar evaluaciones en un episodio dado de alta");
+    }
+
     const validated = evaluationSchema.parse(data);
 
     const evaluation = await prisma.evaluation.update({
       where: { id },
       data: {
+        episodeId,
         ...validated,
         painScale: validated.painScale !== "" ? Number(validated.painScale) : null,
       },
@@ -157,15 +341,17 @@ export async function updateEvaluation(id: string, patientId: string, data: Eval
   }
 }
 
-export async function deleteEvaluation(id: string, patientId: string) {
+export async function deleteEvaluation(id: string, patientId: string, episodeId: string) {
   try {
     const user = await getCurrentUserOrThrow();
+    await assertEpisodeBelongsToPatient(episodeId, patientId);
 
     const evaluation = await prisma.evaluation.findUnique({
       where: { id },
       select: {
         id: true,
         patientId: true,
+        episodeId: true,
         professionalId: true,
       },
     });
@@ -176,6 +362,10 @@ export async function deleteEvaluation(id: string, patientId: string) {
 
     if (evaluation.patientId !== patientId) {
       throw new Error("La evaluación no corresponde al paciente seleccionado");
+    }
+
+    if (evaluation.episodeId !== episodeId) {
+      throw new Error("La evaluación no corresponde al episodio seleccionado");
     }
 
     assertCanAccessOwnedResource(
@@ -196,14 +386,18 @@ export async function deleteEvaluation(id: string, patientId: string) {
   }
 }
 
-export async function getSessions(patientId: string) {
+export async function getSessions(patientId: string, episodeId?: string) {
   try {
     const user = await getCurrentUserOrThrow();
     await assertPatientExistsAndActive(patientId);
+    if (episodeId) {
+      await assertEpisodeBelongsToPatient(episodeId, patientId);
+    }
 
     const sessions = await prisma.session.findMany({
       where: { 
         patientId,
+        ...(episodeId ? { episodeId } : {}),
         ...(user.role === "ADMIN" ? {} : { professionalId: user.id }),
       },
       orderBy: { date: "desc" },
@@ -216,10 +410,15 @@ export async function getSessions(patientId: string) {
   }
 }
 
-export async function createSession(patientId: string, data: SessionEvolutionValues) {
+export async function createSession(patientId: string, episodeId: string, data: SessionEvolutionValues) {
   try {
     const user = await getCurrentUserOrThrow();
     await assertPatientExistsAndActive(patientId);
+    const episode = await assertEpisodeBelongsToPatient(episodeId, patientId);
+
+    if (episode.status === CareEpisodeStatus.DISCHARGED) {
+      throw new Error("No se pueden registrar sesiones en un episodio dado de alta");
+    }
 
     const validated = sessionEvolutionSchema.parse(data);
 
@@ -251,6 +450,7 @@ export async function createSession(patientId: string, data: SessionEvolutionVal
     const session = await prisma.session.create({
       data: {
         patientId,
+        episodeId,
         professionalId: user.id,
         date: new Date(validated.date),
         startTime: validated.startTime || "00:00",
@@ -272,16 +472,18 @@ export async function createSession(patientId: string, data: SessionEvolutionVal
   }
 }
 
-export async function updateSession(id: string, patientId: string, data: SessionEvolutionValues) {
+export async function updateSession(id: string, patientId: string, episodeId: string, data: SessionEvolutionValues) {
   try {
     const user = await getCurrentUserOrThrow();
     await assertPatientExistsAndActive(patientId);
+    const episode = await assertEpisodeBelongsToPatient(episodeId, patientId);
 
     const existing = await prisma.session.findUnique({
       where: { id },
       select: {
         id: true,
         patientId: true,
+        episodeId: true,
         professionalId: true,
       },
     });
@@ -294,11 +496,19 @@ export async function updateSession(id: string, patientId: string, data: Session
       throw new Error("La sesión no corresponde al paciente seleccionado");
     }
 
+    if (existing.episodeId !== episodeId) {
+      throw new Error("La sesión no corresponde al episodio seleccionado");
+    }
+
     assertCanAccessOwnedResource(
       user,
       existing.professionalId,
       "No tienes permiso para editar esta sesión"
     );
+
+    if (episode.status === CareEpisodeStatus.DISCHARGED) {
+      throw new Error("No se pueden editar sesiones en un episodio dado de alta");
+    }
 
     const validated = sessionEvolutionSchema.parse(data);
 
@@ -330,6 +540,7 @@ export async function updateSession(id: string, patientId: string, data: Session
     const session = await prisma.session.update({
       where: { id },
       data: {
+        episodeId,
         date: new Date(validated.date),
         startTime: validated.startTime || "00:00",
         duration: validated.duration,
@@ -350,15 +561,17 @@ export async function updateSession(id: string, patientId: string, data: Session
   }
 }
 
-export async function deleteSession(id: string, patientId: string) {
+export async function deleteSession(id: string, patientId: string, episodeId: string) {
   try {
     const user = await getCurrentUserOrThrow();
+    await assertEpisodeBelongsToPatient(episodeId, patientId);
 
     const session = await prisma.session.findUnique({
       where: { id },
       select: {
         id: true,
         patientId: true,
+        episodeId: true,
         professionalId: true,
       },
     });
@@ -369,6 +582,10 @@ export async function deleteSession(id: string, patientId: string) {
 
     if (session.patientId !== patientId) {
       throw new Error("La sesión no corresponde al paciente seleccionado");
+    }
+
+    if (session.episodeId !== episodeId) {
+      throw new Error("La sesión no corresponde al episodio seleccionado");
     }
 
     assertCanAccessOwnedResource(

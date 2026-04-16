@@ -26,10 +26,11 @@ import {
   Target,
   ClipboardList,
 } from 'lucide-react';
+import type { ClinicalHistoryRecord } from './types';
 
 interface AnamnesisFormProps {
   patientId: string;
-  initialData: any;
+  initialData: ClinicalHistoryRecord | null;
 }
 
 export function AnamnesisForm({ patientId, initialData }: AnamnesisFormProps) {
@@ -56,7 +57,7 @@ export function AnamnesisForm({ patientId, initialData }: AnamnesisFormProps) {
     try {
       await updateClinicalHistory(patientId, data);
       toast.success('Historial guardado exitosamente');
-    } catch (error) {
+    } catch {
       toast.error('Error al guardar el historial');
     }
   };
@@ -106,10 +107,10 @@ export function AnamnesisForm({ patientId, initialData }: AnamnesisFormProps) {
               </div>
               <div>
                 <CardTitle className="text-lg">
-                  Motivo y Enfermedad Actual
+                  Contexto Clínico General
                 </CardTitle>
                 <CardDescription>
-                  Exploración del dolor y la limitación
+                  Información transversal del paciente. Los problemas puntuales se registran por episodio.
                 </CardDescription>
               </div>
             </div>
@@ -120,22 +121,22 @@ export function AnamnesisForm({ patientId, initialData }: AnamnesisFormProps) {
                 htmlFor="reasonForConsultation"
                 className="text-sm font-medium"
               >
-                Motivo Principal de Consulta
+                Motivo general de consulta
               </Label>
               <Textarea
                 id="reasonForConsultation"
                 {...register('reasonForConsultation')}
-                placeholder="¿Por qué consulta el paciente?"
+                placeholder="Resumen general del tipo de consultas o antecedentes funcionales"
                 className="resize-none min-h-20"
                 rows={2}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="currentIllness" className="text-sm font-medium">
-                Qué lo trae a tratamiento
+                Situación clínica de base
               </Label>
               <p className="text-xs text-muted-foreground">
-                Dolor, EVA, lesión específica
+                Contexto general útil para futuras atenciones
               </p>
               <Textarea
                 id="currentIllness"
@@ -221,10 +222,10 @@ export function AnamnesisForm({ patientId, initialData }: AnamnesisFormProps) {
             </div>
             <div>
               <CardTitle className="text-lg">
-                Diagnóstico y Plan Kinésico
+                  Criterio clínico global
               </CardTitle>
               <CardDescription>
-                Evaluación profesional y estrategia de tratamiento
+                Notas de referencia general. El plan específico se define por episodio.
               </CardDescription>
             </div>
           </div>
@@ -232,7 +233,7 @@ export function AnamnesisForm({ patientId, initialData }: AnamnesisFormProps) {
         <CardContent className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="kinesicDiagnosis" className="text-sm font-medium">
-              Diagnóstico Kinésico Funcional
+              Diagnóstico funcional global
             </Label>
             <Textarea
               id="kinesicDiagnosis"
@@ -248,7 +249,7 @@ export function AnamnesisForm({ patientId, initialData }: AnamnesisFormProps) {
               <div className="flex items-center gap-2 mb-2">
                 <Target className="h-4 w-4 text-primary" />
                 <Label htmlFor="treatmentGoals" className="text-sm font-medium">
-                  Objetivos del Tratamiento
+                  Objetivos globales
                 </Label>
               </div>
               <p className="text-xs text-muted-foreground mb-2">
@@ -267,7 +268,7 @@ export function AnamnesisForm({ patientId, initialData }: AnamnesisFormProps) {
               <div className="flex items-center gap-2 mb-2">
                 <Stethoscope className="h-4 w-4 text-primary" />
                 <Label htmlFor="treatmentPlan" className="text-sm font-medium">
-                  Plan de Tratamiento
+                  Lineamientos terapéuticos generales
                 </Label>
               </div>
               <p className="text-xs text-muted-foreground mb-2">

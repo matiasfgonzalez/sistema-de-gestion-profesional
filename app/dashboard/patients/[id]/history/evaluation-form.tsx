@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   evaluationSchema,
@@ -30,18 +30,21 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Trash2 } from 'lucide-react';
+import type { EvaluationRecord } from './types';
 
 interface EvaluationFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   patientId: string;
-  evaluation?: any | null;
+  episodeId: string;
+  evaluation?: EvaluationRecord | null;
 }
 
 export function EvaluationForm({
   open,
   onOpenChange,
   patientId,
+  episodeId,
   evaluation,
 }: EvaluationFormProps) {
   const isEditing = !!evaluation;
@@ -49,10 +52,9 @@ export function EvaluationForm({
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
-    setValue,
-    watch,
+    formState: { isSubmitting },
     reset,
+    control,
   } = useForm<EvaluationFormInput, unknown, EvaluationValues>({
     resolver: zodResolver(evaluationSchema),
     defaultValues: {
@@ -98,15 +100,15 @@ export function EvaluationForm({
   const onSubmit = async (data: EvaluationValues) => {
     try {
       if (isEditing) {
-        await updateEvaluation(evaluation.id, patientId, data);
+        await updateEvaluation(evaluation.id, patientId, episodeId, data);
         toast.success('Evaluación actualizada correctamente');
       } else {
-        await createEvaluation(patientId, data);
+        await createEvaluation(patientId, episodeId, data);
         toast.success('Evaluación guardada exitosamente');
       }
       onOpenChange(false);
       reset();
-    } catch (error) {
+    } catch {
       toast.error('Error al procesar evaluación');
     }
   };
@@ -120,10 +122,10 @@ export function EvaluationForm({
     )
       return;
     try {
-      await deleteEvaluation(evaluation.id, patientId);
+      await deleteEvaluation(evaluation.id, patientId, episodeId);
       toast.success('Evaluación eliminada');
       onOpenChange(false);
-    } catch (error) {
+    } catch {
       toast.error('Error el eliminar');
     }
   };
@@ -149,23 +151,29 @@ export function EvaluationForm({
               <Label htmlFor="type" className="text-sm font-semibold">
                 Tipo de Evaluación
               </Label>
-              <Select
-                value={watch('type')}
-                onValueChange={(val) =>
-                  setValue('type', val as NonNullable<EvaluationFormInput['type']>)
-                }
-              >
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Seleccionar tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="INIT">Evaluación Inicial</SelectItem>
-                  <SelectItem value="FOLLOW_UP">
-                    Re-evaluación (Seguimiento)
-                  </SelectItem>
-                  <SelectItem value="DISCHARGE">Alta Kinesiológica</SelectItem>
-                </SelectContent>
-              </Select>
+              <Controller
+                control={control}
+                name="type"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(val) =>
+                      field.onChange(val as NonNullable<EvaluationFormInput['type']>)
+                    }
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Seleccionar tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="INIT">Evaluación Inicial</SelectItem>
+                      <SelectItem value="FOLLOW_UP">
+                        Re-evaluación (Seguimiento)
+                      </SelectItem>
+                      <SelectItem value="DISCHARGE">Alta Kinesiológica</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="painScale" className="text-sm font-semibold">

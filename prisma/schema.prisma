@@ -37,6 +37,13 @@ enum Role {
   PROFESSIONAL
 }
 
+enum CareEpisodeStatus {
+  ACTIVE
+  ON_HOLD
+  DISCHARGED
+  CANCELLED
+}
+
 // Patient model
 model Patient {
   id              String    @id @default(cuid())
@@ -59,6 +66,7 @@ model Patient {
   appointments    Appointment[]
   sessions        Session[]
   clinicalHistory ClinicalHistory?
+  careEpisodes    CareEpisode[]
   evaluations     Evaluation[]
   
   @@index([dni])
@@ -103,6 +111,7 @@ enum AppointmentStatus {
 model Session {
   id              String        @id @default(cuid())
   patientId       String
+  episodeId       String?
   professionalId  String
   appointmentId   String?       @unique
   date            DateTime      @default(now())
@@ -122,10 +131,12 @@ model Session {
   
   // Relations
   patient         Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  episode         CareEpisode?  @relation(fields: [episodeId], references: [id], onDelete: SetNull)
   professional    User          @relation(fields: [professionalId], references: [id])
   appointment     Appointment?  @relation(fields: [appointmentId], references: [id])
   
   @@index([patientId])
+  @@index([episodeId])
   @@index([professionalId])
   @@index([date])
 }
@@ -149,10 +160,37 @@ model ClinicalHistory {
   patient               Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
 }
 
+model CareEpisode {
+  id                String            @id @default(cuid())
+  patientId         String
+  title             String
+  focusArea         String?
+  startDate         DateTime          @default(now())
+  endDate           DateTime?
+  status            CareEpisodeStatus @default(ACTIVE)
+  chiefComplaint    String?           @db.Text
+  currentCondition  String?           @db.Text
+  kinesicDiagnosis  String?           @db.Text
+  treatmentGoals    String?           @db.Text
+  treatmentPlan     String?           @db.Text
+  dischargeSummary  String?           @db.Text
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  patient           Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  evaluations       Evaluation[]
+  sessions          Session[]
+
+  @@index([patientId])
+  @@index([status])
+  @@index([startDate])
+}
+
 // Evaluation / Re-evaluations
 model Evaluation {
   id                String   @id @default(cuid())
   patientId         String
+  episodeId         String?
   professionalId    String
   evalDate          DateTime @default(now())
   type              String   // INIT, FOLLOW_UP, DISCHARGE
@@ -167,8 +205,10 @@ model Evaluation {
   updatedAt         DateTime @updatedAt
 
   patient           Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  episode           CareEpisode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
   professional      User     @relation(fields: [professionalId], references: [id])
   
   @@index([patientId])
+  @@index([episodeId])
   @@index([evalDate])
 }

@@ -33,7 +33,7 @@ Cada paciente avanza por un flujo asistencial trazable: registro administrativo 
   - metricas de pacientes activos, turnos del dia, no-show y carga de agenda.
 - [x] Reemplazar `analytics` mockeado por consultas a BD:
   - ocupacion, cancelaciones, asistencia y tendencia por periodo.
-- [ ] Definir flujo clinico formal por episodio:
+- [x] Definir flujo clinico formal por episodio:
   - evaluacion inicial -> plan terapeutico -> sesiones -> reevaluacion -> alta.
   - estados e hitos obligatorios para asegurar consistencia.
 - [ ] Mejorar manejo de errores de dominio:
@@ -105,7 +105,7 @@ Cada paciente avanza por un flujo asistencial trazable: registro administrativo 
 
 ### Fase 2 (3-6 semanas)
 - [x] Dashboard y analytics con datos reales.
-- [ ] Flujo clinico formal por episodio.
+- [x] Flujo clinico formal por episodio.
 - [ ] Errores de dominio y mejoras UX en formularios.
 
 ### Fase 3 (4-8 semanas)

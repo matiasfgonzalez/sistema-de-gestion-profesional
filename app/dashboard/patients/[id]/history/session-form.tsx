@@ -23,18 +23,21 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Trash2 } from 'lucide-react';
+import type { SessionRecord } from './types';
 
 interface SessionFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   patientId: string;
-  sessionInfo?: any | null;
+  episodeId: string;
+  sessionInfo?: SessionRecord | null;
 }
 
 export function SessionForm({
   open,
   onOpenChange,
   patientId,
+  episodeId,
   sessionInfo,
 }: SessionFormProps) {
   const isEditing = !!sessionInfo;
@@ -90,15 +93,15 @@ export function SessionForm({
   const onSubmit = async (data: SessionEvolutionValues) => {
     try {
       if (isEditing) {
-        await updateSession(sessionInfo.id, patientId, data);
+        await updateSession(sessionInfo.id, patientId, episodeId, data);
         toast.success('Sesión actualizada correctamente');
       } else {
-        await createSession(patientId, data);
+        await createSession(patientId, episodeId, data);
         toast.success('Sesión registrada exitosamente');
       }
       onOpenChange(false);
       reset();
-    } catch (error) {
+    } catch {
       toast.error('Error al procesar sesión');
     }
   };
@@ -110,10 +113,10 @@ export function SessionForm({
     )
       return;
     try {
-      await deleteSession(sessionInfo.id, patientId);
+      await deleteSession(sessionInfo.id, patientId, episodeId);
       toast.success('Sesión eliminada');
       onOpenChange(false);
-    } catch (error) {
+    } catch {
       toast.error('Error el eliminar');
     }
   };

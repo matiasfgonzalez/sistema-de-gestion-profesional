@@ -13,17 +13,20 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SessionForm } from './session-form';
+import type { SessionRecord } from './types';
 
 interface SessionsTabProps {
   patientId: string;
-  sessions: any[]; // Prisma Session Type
+  episodeId?: string | null;
+  episodeTitle?: string | null;
+  sessions: SessionRecord[];
 }
 
-export function SessionsTab({ patientId, sessions }: SessionsTabProps) {
+export function SessionsTab({ patientId, episodeId, episodeTitle, sessions }: SessionsTabProps) {
   const [formOpen, setFormOpen] = useState(false);
-  const [selectedSession, setSelectedSession] = useState<any | null>(null);
+  const [selectedSession, setSelectedSession] = useState<SessionRecord | null>(null);
 
-  const handleOpenForm = (session?: any) => {
+  const handleOpenForm = (session?: SessionRecord) => {
     setSelectedSession(session || null);
     setFormOpen(true);
   };
@@ -59,7 +62,7 @@ export function SessionsTab({ patientId, sessions }: SessionsTabProps) {
       acc[monthYear].push(session);
       return acc;
     },
-    {} as Record<string, any[]>,
+    {} as Record<string, SessionRecord[]>,
   );
 
   return (
@@ -79,11 +82,18 @@ export function SessionsTab({ patientId, sessions }: SessionsTabProps) {
           onClick={() => handleOpenForm()}
           size="lg"
           className="shadow-md"
+          disabled={!episodeId}
         >
           <Plus className="w-4 h-4 mr-2" />
           Registrar Sesión
         </Button>
       </div>
+
+      {episodeTitle && (
+        <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+          Episodio activo: <span className="font-medium text-foreground">{episodeTitle}</span>
+        </div>
+      )}
 
       {/* Empty State */}
       {sessions.length === 0 ? (
@@ -93,13 +103,16 @@ export function SessionsTab({ patientId, sessions }: SessionsTabProps) {
               <NotebookPen className="h-8 w-8 text-muted-foreground/50" />
             </div>
             <h3 className="text-lg font-semibold text-foreground mb-2">
-              Sin sesiones registradas
+              {episodeId
+                ? 'Sin sesiones registradas para este episodio'
+                : 'Selecciona un episodio clínico'}
             </h3>
             <p className="text-sm text-muted-foreground mb-6 max-w-sm">
-              Comienza a documentar cada sesión de tratamiento para seguir el
-              progreso
+              {episodeId
+                ? 'Comienza a documentar cada sesión del tratamiento para seguir la evolución del episodio'
+                : 'Debes seleccionar o crear un episodio antes de registrar sesiones'}
             </p>
-            <Button onClick={() => handleOpenForm()} variant="outline">
+            <Button onClick={() => handleOpenForm()} variant="outline" disabled={!episodeId}>
               <Plus className="w-4 h-4 mr-2" />
               Registrar primera sesión
             </Button>
@@ -246,6 +259,7 @@ export function SessionsTab({ patientId, sessions }: SessionsTabProps) {
         open={formOpen}
         onOpenChange={setFormOpen}
         patientId={patientId}
+        episodeId={episodeId ?? ''}
         sessionInfo={selectedSession}
       />
     </div>

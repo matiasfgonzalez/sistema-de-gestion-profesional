@@ -1,14 +1,37 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { CareEpisodeStatus } from '@prisma/client';
 import { getPatientById } from '../../actions';
-import { getClinicalHistory, getEvaluations, getSessions } from './actions';
+import {
+  getCareEpisodes,
+  getClinicalHistory,
+  getEvaluations,
+  getSessions,
+} from './actions';
 import { AnamnesisForm } from './anamnesis-form';
 import { EvaluationsTab } from './evaluations-tab';
 import { SessionsTab } from './sessions-tab';
+import { EpisodeForm } from './episode-form';
+import type {
+  CareEpisodeRecord,
+  ClinicalHistoryRecord,
+  EvaluationRecord,
+  PatientHistoryPatient,
+  SessionRecord,
+} from './types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   ArrowLeft,
   User,
@@ -18,6 +41,12 @@ import {
   AlertCircle,
   Phone,
   Calendar,
+  BriefcaseMedical,
+  Plus,
+  Pencil,
+  CheckCircle2,
+  ClipboardList,
+  Stethoscope,
 } from 'lucide-react';
 
 export default function PatientHistoryPage() {
@@ -26,26 +55,40 @@ export default function PatientHistoryPage() {
   const patientId = params.id as string;
 
   const [isLoading, setIsLoading] = useState(true);
-  const [patient, setPatient] = useState<any>(null);
-  const [history, setHistory] = useState<any>(null);
-  const [evaluations, setEvaluations] = useState<any[]>([]);
-  const [sessions, setSessions] = useState<any[]>([]);
+  const [patient, setPatient] = useState<PatientHistoryPatient | null>(null);
+  const [history, setHistory] = useState<ClinicalHistoryRecord | null>(null);
+  const [episodes, setEpisodes] = useState<CareEpisodeRecord[]>([]);
+  const [evaluations, setEvaluations] = useState<EvaluationRecord[]>([]);
+  const [sessions, setSessions] = useState<SessionRecord[]>([]);
+  const [selectedEpisodeId, setSelectedEpisodeId] = useState<string | null>(null);
+  const [episodeFormOpen, setEpisodeFormOpen] = useState(false);
+  const [editingEpisode, setEditingEpisode] = useState<CareEpisodeRecord | null>(null);
 
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [patData, histData, evalsData, sessData] = await Promise.all([
+        const [patData, histData, episodesData, evalsData, sessData] = await Promise.all([
           getPatientById(patientId),
           getClinicalHistory(patientId),
+          getCareEpisodes(patientId),
           getEvaluations(patientId),
           getSessions(patientId),
         ]);
 
         setPatient(patData);
         setHistory(histData);
+        setEpisodes(episodesData);
         setEvaluations(evalsData);
         setSessions(sessData);
+        setSelectedEpisodeId((current) => {
+          if (current && episodesData.some((episode: CareEpisodeRecord) => episode.id === current)) {
+            return current;
+          }
+          return episodesData.find((episode: CareEpisodeRecord) => episode.status === CareEpisodeStatus.ACTIVE)?.id
+            ?? episodesData[0]?.id
+            ?? null;
+        });
       } catch (error) {
         console.error(error);
       } finally {
@@ -57,6 +100,84 @@ export default function PatientHistoryPage() {
       loadData();
     }
   }, [patientId]);
+
+  const selectedEpisode = useMemo(
+    () => episodes.find((episode) => episode.id === selectedEpisodeId) ?? null,
+    [episodes, selectedEpisodeId]
+  );
+
+  const episodeEvaluations = useMemo(
+    () => evaluations.filter((evaluation) => evaluation.episodeId === selectedEpisodeId),
+    [evaluations, selectedEpisodeId]
+  );
+
+  const episodeSessions = useMemo(
+    () => sessions.filter((session) => session.episodeId === selectedEpisodeId),
+    [sessions, selectedEpisodeId]
+  );
+
+  const workflowSummary = useMemo(() => {
+    if (!selectedEpisode) {
+      return null;
+    }
+
+    const hasInitialEvaluation = episodeEvaluations.some((item) => item.type === 'INIT');
+    const hasFollowUpEvaluation = episodeEvaluations.some((item) => item.type === 'FOLLOW_UP');
+    const hasDischargeEvaluation = episodeEvaluations.some((item) => item.type === 'DISCHARGE');
+    const hasPlan = Boolean(selectedEpisode.kinesicDiagnosis?.trim())
+      && Boolean(selectedEpisode.treatmentGoals?.trim())
+      && Boolean(selectedEpisode.treatmentPlan?.trim());
+
+    const steps = [
+      {
+        label: 'Evaluación inicial',
+        done: hasInitialEvaluation,
+      },
+      {
+        label: 'Plan terapéutico',
+        done: hasPlan,
+      },
+      {
+        label: 'Sesiones',
+        done: episodeSessions.length > 0,
+      },
+      {
+        label: 'Reevaluación',
+        done: hasFollowUpEvaluation,
+      },
+      {
+        label: 'Alta',
+        done: hasDischargeEvaluation || selectedEpisode.status === CareEpisodeStatus.DISCHARGED,
+      },
+    ];
+
+    return {
+      steps,
+      currentStage:
+        steps.find((step) => !step.done)?.label ?? 'Episodio cerrado',
+    };
+  }, [selectedEpisode, episodeEvaluations, episodeSessions]);
+
+  const refreshClinicalData = async () => {
+    const [episodesData, evalsData, sessData] = await Promise.all([
+      getCareEpisodes(patientId),
+      getEvaluations(patientId),
+      getSessions(patientId),
+    ]);
+
+    setEpisodes(episodesData);
+    setEvaluations(evalsData);
+    setSessions(sessData);
+    setSelectedEpisodeId((current) => {
+      if (current && episodesData.some((episode: CareEpisodeRecord) => episode.id === current)) {
+        return current;
+      }
+
+      return episodesData.find((episode: CareEpisodeRecord) => episode.status === CareEpisodeStatus.ACTIVE)?.id
+        ?? episodesData[0]?.id
+        ?? null;
+    });
+  };
 
   if (isLoading) {
     return (
@@ -194,10 +315,157 @@ export default function PatientHistoryPage() {
           </div>
         </div>
 
-        {/* Tabs Layout - Mejorado */}
-        <Tabs defaultValue="anamnesis" className="w-full flex flex-col">
+        <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+          <div className="space-y-6">
+            <Card className="shadow-sm">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <BriefcaseMedical className="h-5 w-5 text-primary" />
+                    Episodios de atención
+                  </CardTitle>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setEditingEpisode(null);
+                      setEpisodeFormOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Nuevo
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {episodes.length > 0 ? (
+                  <>
+                    <Select
+                      value={selectedEpisodeId ?? undefined}
+                      onValueChange={setSelectedEpisodeId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar episodio" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {episodes.map((episode) => (
+                          <SelectItem key={episode.id} value={episode.id}>
+                            {episode.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {selectedEpisode && (
+                      <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-foreground">
+                              {selectedEpisode.title}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {selectedEpisode.focusArea || 'Sin zona definida'}
+                            </p>
+                          </div>
+                          <Badge variant="outline">
+                            {selectedEpisode.status === CareEpisodeStatus.ACTIVE
+                              ? 'Activo'
+                              : selectedEpisode.status === CareEpisodeStatus.ON_HOLD
+                                ? 'En pausa'
+                                : selectedEpisode.status === CareEpisodeStatus.DISCHARGED
+                                  ? 'Alta'
+                                  : 'Cancelado'}
+                          </Badge>
+                        </div>
+
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          <p>
+                            Inicio:{' '}
+                            <span className="text-foreground">
+                              {new Date(selectedEpisode.startDate).toLocaleDateString('es-AR')}
+                            </span>
+                          </p>
+                          <p>
+                            Evaluaciones:{' '}
+                            <span className="text-foreground">{episodeEvaluations.length}</span>
+                          </p>
+                          <p>
+                            Sesiones:{' '}
+                            <span className="text-foreground">{episodeSessions.length}</span>
+                          </p>
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => {
+                            setEditingEpisode(selectedEpisode);
+                            setEpisodeFormOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Editar episodio
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border p-6 text-center">
+                    <p className="font-medium text-foreground">
+                      Todavía no hay episodios clínicos
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Crea un episodio para separar una atención por esguince,
+                      desgarro u otro motivo clínico independiente.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <CheckCircle2 className="h-5 w-5 text-primary" />
+                  Flujo del episodio
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!selectedEpisode || !workflowSummary ? (
+                  <p className="text-sm text-muted-foreground">
+                    Selecciona un episodio para visualizar su circuito clínico.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="rounded-lg bg-primary/5 border border-primary/10 px-3 py-2 text-sm">
+                      Etapa actual:{' '}
+                      <span className="font-medium text-foreground">
+                        {workflowSummary.currentStage}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {workflowSummary.steps.map((step) => (
+                        <div
+                          key={step.label}
+                          className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
+                        >
+                          <span className="text-sm text-foreground">{step.label}</span>
+                          <Badge variant={step.done ? 'success' : 'outline'}>
+                            {step.done ? 'Completo' : 'Pendiente'}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Tabs Layout - Mejorado */}
+          <Tabs defaultValue="anamnesis" className="w-full flex flex-col">
           {/* Fila Superior: TabsList Sticky */}
-          <div className="sticky top-[73px] z-20 bg-background/95 backdrop-blur-lg border-b border-border/50 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-4 mb-6">
+          <div className="sticky top-[73px] z-20 bg-background/95 backdrop-blur-lg border-b border-border/50 -mx-4 sm:-mx-6 lg:mx-0 lg:px-0 px-4 sm:px-6 py-4 mb-6">
             <TabsList className="inline-flex h-auto w-full sm:w-auto p-1 bg-muted/50 rounded-xl shadow-sm">
               <TabsTrigger
                 value="anamnesis"
@@ -205,9 +473,17 @@ export default function PatientHistoryPage() {
               >
                 <FileText className="w-4 h-4 mr-2 shrink-0" />
                 <span className="hidden sm:inline whitespace-nowrap">
-                  Anamnesis / Historial
+                  Historia General
                 </span>
-                <span className="sm:hidden">Historial</span>
+                <span className="sm:hidden">General</span>
+              </TabsTrigger>
+
+              <TabsTrigger
+                value="episode"
+                className="flex-1 sm:flex-none rounded-lg px-4 py-2.5 data-active:bg-background data-active:shadow-md transition-all"
+              >
+                <ClipboardList className="w-4 h-4 mr-2 shrink-0" />
+                <span className="whitespace-nowrap">Episodio</span>
               </TabsTrigger>
 
               <TabsTrigger
@@ -238,21 +514,108 @@ export default function PatientHistoryPage() {
             </TabsContent>
 
             <TabsContent
+              value="episode"
+              className="m-0 focus-visible:outline-none"
+            >
+              {selectedEpisode ? (
+                <div className="space-y-6 pb-24">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Stethoscope className="h-5 w-5 text-primary" />
+                        Resumen del episodio activo
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Motivo de consulta</p>
+                          <p className="mt-1 text-sm text-foreground">
+                            {selectedEpisode.chiefComplaint || 'No registrado'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Condición actual</p>
+                          <p className="mt-1 text-sm text-foreground">
+                            {selectedEpisode.currentCondition || 'No registrada'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Diagnóstico kinésico</p>
+                          <p className="mt-1 text-sm text-foreground">
+                            {selectedEpisode.kinesicDiagnosis || 'No registrado'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Objetivos terapéuticos</p>
+                          <p className="mt-1 text-sm text-foreground">
+                            {selectedEpisode.treatmentGoals || 'No registrados'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-sm text-muted-foreground">Plan terapéutico</p>
+                        <p className="mt-1 text-sm text-foreground whitespace-pre-wrap">
+                          {selectedEpisode.treatmentPlan || 'No definido'}
+                        </p>
+                      </div>
+
+                      {selectedEpisode.dischargeSummary && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Resumen de alta</p>
+                          <p className="mt-1 text-sm text-foreground whitespace-pre-wrap">
+                            {selectedEpisode.dischargeSummary}
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="py-16 text-center text-muted-foreground">
+                    Crea o selecciona un episodio para trabajar su circuito clínico.
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent
               value="evaluations"
               className="m-0 focus-visible:outline-none"
             >
-              <EvaluationsTab patientId={patientId} evaluations={evaluations} />
+              <EvaluationsTab
+                patientId={patientId}
+                episodeId={selectedEpisodeId}
+                episodeTitle={selectedEpisode?.title}
+                evaluations={episodeEvaluations}
+              />
             </TabsContent>
 
             <TabsContent
               value="sessions"
               className="m-0 focus-visible:outline-none"
             >
-              <SessionsTab patientId={patientId} sessions={sessions} />
+              <SessionsTab
+                patientId={patientId}
+                episodeId={selectedEpisodeId}
+                episodeTitle={selectedEpisode?.title}
+                sessions={episodeSessions}
+              />
             </TabsContent>
           </div>
         </Tabs>
+        </div>
       </div>
+
+      <EpisodeForm
+        open={episodeFormOpen}
+        onOpenChange={setEpisodeFormOpen}
+        patientId={patientId}
+        episode={editingEpisode}
+        onSaved={refreshClinicalData}
+      />
     </div>
   );
 }
