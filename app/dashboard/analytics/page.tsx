@@ -1,257 +1,268 @@
-"use client";
+import { endOfMonth, startOfMonth, subMonths } from "date-fns";
+import { AppointmentStatus, Prisma } from "@prisma/client";
+import { getCurrentUserOrThrow, isAdmin } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { AnalyticsClient } from "./analytics-client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
-import { Users, CalendarCheck, Clock, TrendingUp } from "lucide-react";
+const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+const STATUS_COLORS: Record<AppointmentStatus, string> = {
+  COMPLETED: "hsl(174 65% 35%)",
+  PENDING: "hsl(38 92% 50%)",
+  CANCELLED: "hsl(0 84% 60%)",
+  NO_SHOW: "hsl(215 16% 47%)",
+  CONFIRMED: "hsl(221 83% 53%)",
+};
 
-const monthlyPatientsData = [
-  { month: "Ene", patients: 45 },
-  { month: "Feb", patients: 52 },
-  { month: "Mar", patients: 48 },
-  { month: "Abr", patients: 61 },
-  { month: "May", patients: 55 },
-  { month: "Jun", patients: 67 },
-  { month: "Jul", patients: 72 },
-  { month: "Ago", patients: 68 },
-  { month: "Sep", patients: 74 },
-  { month: "Oct", patients: 81 },
-  { month: "Nov", patients: 78 },
-  { month: "Dic", patients: 85 },
-];
+function buildMonthRanges(count: number, baseDate: Date) {
+  return Array.from({ length: count }, (_, index) => {
+    const date = subMonths(baseDate, count - 1 - index);
+    return {
+      label: MONTH_LABELS[date.getMonth()],
+      start: startOfMonth(date),
+      end: endOfMonth(date),
+    };
+  });
+}
 
-const appointmentsByStatusData = [
-  { status: "Completados", value: 145, color: "hsl(174 65% 35%)" },
-  { status: "Pendientes", value: 32, color: "hsl(38 92% 50%)" },
-  { status: "Cancelados", value: 12, color: "hsl(0 84% 60%)" },
-  { status: "No mostrados", value: 8, color: "hsl(215 16% 47%)" },
-];
+function calculateTrend(currentValue: number, previousValue: number) {
+  if (currentValue === previousValue) {
+    return { value: "0%", trend: "neutral" as const };
+  }
 
-const sessionsByMonthData = [
-  { month: "Ene", sessions: 89 },
-  { month: "Feb", sessions: 95 },
-  { month: "Mar", sessions: 102 },
-  { month: "Abr", sessions: 98 },
-  { month: "May", sessions: 110 },
-  { month: "Jun", sessions: 125 },
-];
+  if (previousValue === 0) {
+    return { value: `+${currentValue}`, trend: "up" as const };
+  }
 
-const stats = [
-  {
-    title: "Total Pacientes",
-    value: "147",
-    change: "+12%",
-    icon: Users,
-    color: "text-primary",
-    bgColor: "bg-primary/10 dark:bg-primary/20",
-  },
-  {
-    title: "Turnos este Mes",
-    value: "48",
-    change: "+8%",
-    icon: CalendarCheck,
-    color: "text-accent",
-    bgColor: "bg-accent/10 dark:bg-accent/20",
-  },
-  {
-    title: "Sesiones este Mes",
-    value: "34",
-    change: "+15%",
-    icon: Clock,
-    color: "text-warning-500",
-    bgColor: "bg-warning-500/10 dark:bg-warning-500/20",
-  },
-  {
-    title: "Tasa de Retencion",
-    value: "89%",
-    change: "+5%",
-    icon: TrendingUp,
-    color: "text-success-500",
-    bgColor: "bg-success-500/10 dark:bg-success-500/20",
-  },
-];
+  const percentage = Math.round(((currentValue - previousValue) / previousValue) * 100);
+  return {
+    value: `${percentage > 0 ? "+" : ""}${percentage}%`,
+    trend: percentage > 0 ? ("up" as const) : ("down" as const),
+  };
+}
 
-export default function AnalyticsPage() {
+export default async function AnalyticsPage() {
+  const user = await getCurrentUserOrThrow();
+  const admin = isAdmin(user);
+  const today = new Date();
+  const currentMonthStart = startOfMonth(today);
+  const currentMonthEnd = endOfMonth(today);
+  const previousMonthDate = subMonths(today, 1);
+  const previousMonthStart = startOfMonth(previousMonthDate);
+  const previousMonthEnd = endOfMonth(previousMonthDate);
+
+  const appointmentScope: Prisma.AppointmentWhereInput = admin
+    ? {}
+    : { professionalId: user.id };
+  const sessionScope: Prisma.SessionWhereInput = admin
+    ? {}
+    : { professionalId: user.id };
+
+  const [
+    totalPatients,
+    appointmentsThisMonth,
+    appointmentsPreviousMonth,
+    sessionsThisMonth,
+    sessionsPreviousMonth,
+    completedAppointments,
+    noShowAppointments,
+    cancelledAppointments,
+  ] = await Promise.all([
+    prisma.patient.count({
+      where: { isActive: true },
+    }),
+    prisma.appointment.count({
+      where: {
+        ...appointmentScope,
+        date: {
+          gte: currentMonthStart,
+          lte: currentMonthEnd,
+        },
+      },
+    }),
+    prisma.appointment.count({
+      where: {
+        ...appointmentScope,
+        date: {
+          gte: previousMonthStart,
+          lte: previousMonthEnd,
+        },
+      },
+    }),
+    prisma.session.count({
+      where: {
+        ...sessionScope,
+        date: {
+          gte: currentMonthStart,
+          lte: currentMonthEnd,
+        },
+      },
+    }),
+    prisma.session.count({
+      where: {
+        ...sessionScope,
+        date: {
+          gte: previousMonthStart,
+          lte: previousMonthEnd,
+        },
+      },
+    }),
+    prisma.appointment.count({
+      where: {
+        ...appointmentScope,
+        date: {
+          gte: currentMonthStart,
+          lte: currentMonthEnd,
+        },
+        status: "COMPLETED",
+      },
+    }),
+    prisma.appointment.count({
+      where: {
+        ...appointmentScope,
+        date: {
+          gte: currentMonthStart,
+          lte: currentMonthEnd,
+        },
+        status: "NO_SHOW",
+      },
+    }),
+    prisma.appointment.count({
+      where: {
+        ...appointmentScope,
+        date: {
+          gte: currentMonthStart,
+          lte: currentMonthEnd,
+        },
+        status: "CANCELLED",
+      },
+    }),
+  ]);
+
+  const patientMonthRanges = buildMonthRanges(12, today);
+  const sessionMonthRanges = buildMonthRanges(6, today);
+
+  const [monthlyPatientsData, sessionsByMonthData] = await Promise.all([
+    Promise.all(
+      patientMonthRanges.map(async (range) => ({
+        month: range.label,
+        patients: await prisma.patient.count({
+          where: {
+            createdAt: {
+              gte: range.start,
+              lte: range.end,
+            },
+          },
+        }),
+      }))
+    ),
+    Promise.all(
+      sessionMonthRanges.map(async (range) => ({
+        month: range.label,
+        sessions: await prisma.session.count({
+          where: {
+            ...sessionScope,
+            date: {
+              gte: range.start,
+              lte: range.end,
+            },
+          },
+        }),
+      }))
+    ),
+  ]);
+
+  const appointmentsByStatusCounts = await Promise.all(
+    (Object.keys(STATUS_COLORS) as AppointmentStatus[]).map(async (status) => ({
+      status,
+      value: await prisma.appointment.count({
+        where: {
+          ...appointmentScope,
+          date: {
+            gte: currentMonthStart,
+            lte: currentMonthEnd,
+          },
+          status,
+        },
+      }),
+    }))
+  );
+
+  const appointmentsByStatusData = appointmentsByStatusCounts
+    .filter((entry) => entry.value > 0)
+    .map((entry) => ({
+      status:
+        entry.status === "COMPLETED"
+          ? "Completados"
+          : entry.status === "PENDING"
+            ? "Pendientes"
+            : entry.status === "CANCELLED"
+              ? "Cancelados"
+              : entry.status === "NO_SHOW"
+                ? "No asistió"
+                : "Confirmados",
+      value: entry.value,
+      color: STATUS_COLORS[entry.status],
+    }));
+
+  const attendanceBase = completedAppointments + noShowAppointments;
+  const attendanceRate =
+    attendanceBase === 0 ? 0 : Math.round((completedAppointments / attendanceBase) * 100);
+  const cancellationRate =
+    appointmentsThisMonth === 0 ? 0 : Math.round((cancelledAppointments / appointmentsThisMonth) * 100);
+
+  const appointmentTrend = calculateTrend(appointmentsThisMonth, appointmentsPreviousMonth);
+  const sessionTrend = calculateTrend(sessionsThisMonth, sessionsPreviousMonth);
+
+  const stats = [
+    {
+      title: "Total Pacientes",
+      value: String(totalPatients),
+      change: `${monthlyPatientsData[monthlyPatientsData.length - 1]?.patients ?? 0} nuevos`,
+      icon: "users" as const,
+      color: "text-primary",
+      bgColor: "bg-primary/10 dark:bg-primary/20",
+      trend: "up" as const,
+    },
+    {
+      title: "Turnos este Mes",
+      value: String(appointmentsThisMonth),
+      change: appointmentTrend.value,
+      icon: "appointments" as const,
+      color: "text-accent",
+      bgColor: "bg-accent/10 dark:bg-accent/20",
+      trend: appointmentTrend.trend,
+    },
+    {
+      title: "Sesiones este Mes",
+      value: String(sessionsThisMonth),
+      change: sessionTrend.value,
+      icon: "sessions" as const,
+      color: "text-warning-500",
+      bgColor: "bg-warning-500/10 dark:bg-warning-500/20",
+      trend: sessionTrend.trend,
+    },
+    {
+      title: "Tasa de Asistencia",
+      value: `${attendanceRate}%`,
+      change: `Cancelaciones ${cancellationRate}%`,
+      icon: "retention" as const,
+      color: "text-success-500",
+      bgColor: "bg-success-500/10 dark:bg-success-500/20",
+      trend: attendanceRate >= 70 ? ("up" as const) : ("down" as const),
+    },
+  ];
+
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground">Analisis</h1>
-        <p className="mt-1 text-muted-foreground">
-          Metricas y estadisticas de tu centro
-        </p>
-      </div>
-
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={stat.title}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className={`p-2 rounded-xl ${stat.bgColor}`}>
-                    <Icon className={`h-5 w-5 ${stat.color}`} />
-                  </div>
-                  <span className="text-xs font-medium text-success-500">
-                    {stat.change}
-                  </span>
-                </div>
-                <div className="mt-4">
-                  <p className="text-2xl font-bold text-foreground">
-                    {stat.value}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {stat.title}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Patients by Month - Line Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Pacientes por Mes</CardTitle>
-            <CardDescription>
-              Evolucion de pacientes registrados durante el ano
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={monthlyPatientsData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis
-                    dataKey="month"
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                  />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "12px",
-                      color: "hsl(var(--foreground))",
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="patients"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    dot={{ fill: "hsl(var(--primary))", r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Appointments by Status - Pie Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Turnos por Estado</CardTitle>
-            <CardDescription>
-              Distribucion de turnos segun su estado actual
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={appointmentsByStatusData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(entry: any) =>
-                      `${entry.status}: ${(entry.percent * 100).toFixed(0)}%`
-                    }
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {appointmentsByStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "12px",
-                      color: "hsl(var(--foreground))",
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Sessions by Month - Bar Chart */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Sesiones Realizadas</CardTitle>
-            <CardDescription>
-              Cantidad de sesiones realizadas por mes
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={sessionsByMonthData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis
-                    dataKey="month"
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                  />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "12px",
-                      color: "hsl(var(--foreground))",
-                    }}
-                  />
-                  <Bar
-                    dataKey="sessions"
-                    fill="hsl(var(--primary))"
-                    radius={[6, 6, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    <AnalyticsClient
+      stats={stats}
+      monthlyPatientsData={monthlyPatientsData}
+      appointmentsByStatusData={appointmentsByStatusData}
+      sessionsByMonthData={sessionsByMonthData}
+      subtitle={
+        admin
+          ? "Metricas y estadisticas globales del centro"
+          : "Metricas y estadisticas de tu actividad profesional"
+      }
+    />
   );
 }

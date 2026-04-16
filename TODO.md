@@ -29,9 +29,9 @@ Cada paciente avanza por un flujo asistencial trazable: registro administrativo 
 
 ## P1 - Alto impacto (producto y experiencia clinica)
 
-- [ ] Convertir dashboard principal en datos reales:
+- [x] Convertir dashboard principal en datos reales:
   - metricas de pacientes activos, turnos del dia, no-show y carga de agenda.
-- [ ] Reemplazar `analytics` mockeado por consultas a BD:
+- [x] Reemplazar `analytics` mockeado por consultas a BD:
   - ocupacion, cancelaciones, asistencia y tendencia por periodo.
 - [ ] Definir flujo clinico formal por episodio:
   - evaluacion inicial -> plan terapeutico -> sesiones -> reevaluacion -> alta.
@@ -104,7 +104,7 @@ Cada paciente avanza por un flujo asistencial trazable: registro administrativo 
 - [x] Edicion real de evaluaciones/sesiones (sin recreacion).
 
 ### Fase 2 (3-6 semanas)
-- [ ] Dashboard y analytics con datos reales.
+- [x] Dashboard y analytics con datos reales.
 - [ ] Flujo clinico formal por episodio.
 - [ ] Errores de dominio y mejoras UX en formularios.
 
