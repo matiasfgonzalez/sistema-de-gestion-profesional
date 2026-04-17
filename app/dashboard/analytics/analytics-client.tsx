@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -73,6 +74,12 @@ export function AnalyticsClient({
   sessionsByMonthData,
   subtitle,
 }: AnalyticsClientProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <div>
       <div className="mb-8">
@@ -83,7 +90,6 @@ export function AnalyticsClient({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         {stats.map((stat) => {
           const Icon = iconMap[stat.icon];
-
           return (
             <Card key={stat.title}>
               <CardContent className="p-6">
@@ -104,12 +110,8 @@ export function AnalyticsClient({
                   </span>
                 </div>
                 <div className="mt-4">
-                  <p className="text-2xl font-bold text-foreground">
-                    {stat.value}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {stat.title}
-                  </p>
+                  <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{stat.title}</p>
                 </div>
               </CardContent>
             </Card>
@@ -118,6 +120,7 @@ export function AnalyticsClient({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        {/* Pacientes por Mes */}
         <Card>
           <CardHeader>
             <CardTitle>Pacientes por Mes</CardTitle>
@@ -126,45 +129,37 @@ export function AnalyticsClient({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={monthlyPatientsData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="hsl(var(--border))"
-                  />
-                  <XAxis
-                    dataKey="month"
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                  />
-                  <YAxis
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "12px",
-                      color: "hsl(var(--foreground))",
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="patients"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    dot={{ fill: "hsl(var(--primary))", r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="h-[300px] w-full min-w-0">
+              {mounted && (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={monthlyPatientsData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "12px",
+                        color: "hsl(var(--foreground))",
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="patients"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(var(--primary))", r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
 
+        {/* Turnos por Estado */}
         <Card>
           <CardHeader>
             <CardTitle>Turnos por Estado</CardTitle>
@@ -173,32 +168,34 @@ export function AnalyticsClient({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={appointmentsByStatusData}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    dataKey="value"
-                    nameKey="status"
-                    labelLine={false}
-                  >
-                    {appointmentsByStatusData.map((entry) => (
-                      <Cell key={entry.status} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "12px",
-                      color: "hsl(var(--foreground))",
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="h-[300px] w-full min-w-0">
+              {mounted && (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={appointmentsByStatusData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      dataKey="value"
+                      nameKey="status"
+                      labelLine={false}
+                    >
+                      {appointmentsByStatusData.map((entry) => (
+                        <Cell key={entry.status} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "12px",
+                        color: "hsl(var(--foreground))",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </div>
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {appointmentsByStatusData.map((entry) => (
@@ -213,15 +210,14 @@ export function AnalyticsClient({
                     />
                     <span className="text-muted-foreground">{entry.status}</span>
                   </div>
-                  <span className="font-medium text-foreground">
-                    {entry.value}
-                  </span>
+                  <span className="font-medium text-foreground">{entry.value}</span>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
 
+        {/* Sesiones Realizadas */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Sesiones Realizadas</CardTitle>
@@ -230,38 +226,25 @@ export function AnalyticsClient({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={sessionsByMonthData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="hsl(var(--border))"
-                  />
-                  <XAxis
-                    dataKey="month"
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                  />
-                  <YAxis
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "12px",
-                      color: "hsl(var(--foreground))",
-                    }}
-                  />
-                  <Bar
-                    dataKey="sessions"
-                    fill="hsl(var(--primary))"
-                    radius={[6, 6, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="h-[300px] w-full min-w-0">
+              {mounted && (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={sessionsByMonthData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "12px",
+                        color: "hsl(var(--foreground))",
+                      }}
+                    />
+                    <Bar dataKey="sessions" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
