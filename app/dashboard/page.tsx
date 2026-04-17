@@ -18,6 +18,8 @@ import {
   ArrowDownRight,
 } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 type UpcomingAppointment = {
   id: string;
   date: Date;

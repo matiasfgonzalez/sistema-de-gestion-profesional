@@ -101,8 +101,8 @@ export function SessionForm({
       }
       onOpenChange(false);
       reset();
-    } catch {
-      toast.error('Error al procesar sesión');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al procesar sesión');
     }
   };
 

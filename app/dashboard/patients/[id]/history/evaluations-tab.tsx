@@ -73,9 +73,9 @@ export function EvaluationsTab({
 
   const getPainTrend = (currentIndex: number) => {
     if (currentIndex === evaluations.length - 1) return null;
-    const current = evaluations[currentIndex].painScale;
-    const previous = evaluations[currentIndex + 1].painScale;
-    if (current === null || previous === null) return null;
+    const current = evaluations[currentIndex]?.painScale;
+    const previous = evaluations[currentIndex + 1]?.painScale;
+    if (current == null || previous == null) return null;
     if (current < previous) return 'down';
     if (current > previous) return 'up';
     return 'same';
@@ -189,7 +189,7 @@ export function EvaluationsTab({
                                 </p>
                                 <div className="flex items-center gap-2">
                                   <Badge
-                                    className={`${getPainBadgeColor(ev.painScale)} text-base font-bold px-3 py-1`}
+                                    className={`${getPainBadgeColor(ev.painScale as number)} text-base font-bold px-3 py-1`}
                                   >
                                     {ev.painScale}/10
                                   </Badge>

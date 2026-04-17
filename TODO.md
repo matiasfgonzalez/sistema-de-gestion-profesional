@@ -36,6 +36,8 @@ Cada paciente avanza por un flujo asistencial trazable: registro administrativo 
 - [x] Definir flujo clinico formal por episodio:
   - evaluacion inicial -> plan terapeutico -> sesiones -> reevaluacion -> alta.
   - estados e hitos obligatorios para asegurar consistencia.
+  - auto-cierre de episodio al registrar evaluacion de alta (DISCHARGE).
+  - validaciones de orden en server actions (sin eval inicial no hay sesiones).
 - [ ] Mejorar manejo de errores de dominio:
   - mensajes accionables (duplicado, conflicto horario, permisos, etc).
   - feedback claro en formularios y acciones.

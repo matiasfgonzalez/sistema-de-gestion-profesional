@@ -45,4 +45,5 @@ function toMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
-export type AppointmentFormValues = z.infer<typeof appointmentFormSchema>;
+export type AppointmentFormInput = z.input<typeof appointmentFormSchema>;
+export type AppointmentFormValues = z.output<typeof appointmentFormSchema>;

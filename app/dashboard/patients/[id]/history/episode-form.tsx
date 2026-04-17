@@ -113,7 +113,7 @@ export function EpisodeForm({
 
   const onSubmit = async (data: CareEpisodeValues) => {
     try {
-      if (isEditing) {
+      if (isEditing && episode) {
         await updateCareEpisode(episode.id, patientId, data);
         toast.success('Episodio actualizado correctamente');
       } else {
@@ -123,8 +123,8 @@ export function EpisodeForm({
 
       onSaved?.();
       onOpenChange(false);
-    } catch {
-      toast.error('No se pudo guardar el episodio clínico');
+    } catch (error: any) {
+      toast.error(error.message || 'No se pudo guardar el episodio clínico');
     }
   };
 

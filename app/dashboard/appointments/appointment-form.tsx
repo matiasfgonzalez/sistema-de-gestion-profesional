@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { appointmentFormSchema, type AppointmentFormValues } from "@/lib/validations/appointment";
+import { appointmentFormSchema, type AppointmentFormValues, type AppointmentFormInput } from "@/lib/validations/appointment";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,7 +61,7 @@ export function AppointmentForm({ open, onOpenChange, appointment, selectedDateF
     setValue,
     watch,
     reset,
-  } = useForm<AppointmentFormValues>({
+  } = useForm<AppointmentFormInput, unknown, AppointmentFormValues>({
     resolver: zodResolver(appointmentFormSchema),
     defaultValues: {
       patientId: "",

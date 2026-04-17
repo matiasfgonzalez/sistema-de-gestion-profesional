@@ -73,7 +73,7 @@ export function EvaluationForm({
     if (open) {
       if (evaluation) {
         reset({
-          type: evaluation.type,
+          type: evaluation.type as "INIT" | "FOLLOW_UP" | "DISCHARGE",
           painScale: evaluation.painScale !== null ? evaluation.painScale : '',
           subjective: evaluation.subjective || '',
           objectivePosture: evaluation.objectivePosture || '',
@@ -108,8 +108,8 @@ export function EvaluationForm({
       }
       onOpenChange(false);
       reset();
-    } catch {
-      toast.error('Error al procesar evaluación');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al procesar evaluación');
     }
   };
 

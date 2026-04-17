@@ -29,6 +29,9 @@ async function assertEpisodeBelongsToPatient(episodeId: string, patientId: strin
       id: true,
       patientId: true,
       status: true,
+      kinesicDiagnosis: true,
+      treatmentGoals: true,
+      treatmentPlan: true,
     },
   });
 
@@ -60,9 +63,10 @@ export async function getClinicalHistory(patientId: string) {
     }
 
     return history;
-  } catch (error) {
+  } catch (error: any) {
+
     console.error("[getClinicalHistory] Error:", error);
-    throw new Error("Error al obtener la historia clínica");
+    throw new Error(error?.message || "Error al obtener la historia clínica");
   }
 }
 
@@ -84,9 +88,10 @@ export async function updateClinicalHistory(patientId: string, data: ClinicalHis
 
     revalidatePath(`/dashboard/patients/${patientId}/history`);
     return history;
-  } catch (error) {
+  } catch (error: any) {
+
     console.error("[updateClinicalHistory] Error:", error);
-    throw new Error("Error al actualizar la historia clínica");
+    throw new Error(error?.message || "Error al actualizar la historia clínica");
   }
 }
 
@@ -107,9 +112,10 @@ export async function getCareEpisodes(patientId: string) {
       },
       orderBy: [{ status: "asc" }, { startDate: "desc" }, { createdAt: "desc" }],
     });
-  } catch (error) {
+  } catch (error: any) {
+
     console.error("[getCareEpisodes] Error:", error);
-    throw new Error("Error al obtener los episodios clínicos");
+    throw new Error(error?.message || "Error al obtener los episodios clínicos");
   }
 }
 
@@ -139,9 +145,10 @@ export async function createCareEpisode(patientId: string, data: CareEpisodeValu
 
     revalidatePath(`/dashboard/patients/${patientId}/history`);
     return episode;
-  } catch (error) {
+  } catch (error: any) {
+
     console.error("[createCareEpisode] Error:", error);
-    throw new Error("Error al crear el episodio clínico");
+    throw new Error(error?.message || "Error al crear el episodio clínico");
   }
 }
 
@@ -172,9 +179,10 @@ export async function updateCareEpisode(id: string, patientId: string, data: Car
 
     revalidatePath(`/dashboard/patients/${patientId}/history`);
     return episode;
-  } catch (error) {
+  } catch (error: any) {
+
     console.error("[updateCareEpisode] Error:", error);
-    throw new Error("Error al actualizar el episodio clínico");
+    throw new Error(error?.message || "Error al actualizar el episodio clínico");
   }
 }
 
@@ -224,9 +232,10 @@ export async function getEpisodeWorkflowSummary(episodeId: string, patientId: st
       hasDischargeEvaluation,
       currentStage,
     };
-  } catch (error) {
+  } catch (error: any) {
+
     console.error("[getEpisodeWorkflowSummary] Error:", error);
-    throw new Error("Error al obtener el flujo del episodio");
+    throw new Error(error?.message || "Error al obtener el flujo del episodio");
   }
 }
 
@@ -248,9 +257,10 @@ export async function getEvaluations(patientId: string, episodeId?: string) {
     });
 
     return evaluations;
-  } catch (error) {
+  } catch (error: any) {
+
     console.error("[getEvaluations] Error:", error);
-    throw new Error("Error al obtener evaluaciones");
+    throw new Error(error?.message || "Error al obtener evaluaciones");
   }
 }
 
@@ -266,6 +276,13 @@ export async function createEvaluation(patientId: string, episodeId: string, dat
 
     const validated = evaluationSchema.parse(data);
 
+    if (validated.type !== "INIT") {
+      const workflow = await getEpisodeWorkflowSummary(episodeId, patientId);
+      if (!workflow.hasInitialEvaluation) {
+        throw new Error("Debe registrar una evaluación inicial antes de agregar reevaluaciones o altas");
+      }
+    }
+
     const evaluation = await prisma.evaluation.create({
       data: {
         patientId,
@@ -276,11 +293,22 @@ export async function createEvaluation(patientId: string, episodeId: string, dat
       },
     });
 
+    if (validated.type === "DISCHARGE") {
+      await prisma.careEpisode.update({
+        where: { id: episodeId },
+        data: {
+          status: CareEpisodeStatus.DISCHARGED,
+          endDate: new Date(),
+        },
+      });
+    }
+
     revalidatePath(`/dashboard/patients/${patientId}/history`);
     return evaluation;
-  } catch (error) {
+  } catch (error: any) {
+
     console.error("[createEvaluation] Error:", error);
-    throw new Error("Error al grabar evaluación");
+    throw new Error(error?.message || "Error al grabar evaluación");
   }
 }
 
@@ -324,6 +352,13 @@ export async function updateEvaluation(id: string, patientId: string, episodeId:
 
     const validated = evaluationSchema.parse(data);
 
+    if (validated.type !== "INIT") {
+      const workflow = await getEpisodeWorkflowSummary(episodeId, patientId);
+      if (!workflow.hasInitialEvaluation && existing.id !== (await prisma.evaluation.findFirst({ where: { episodeId, type: "INIT" } }))?.id) {
+        throw new Error("Debe existir una evaluación inicial antes de cambiar a reevaluaciones o altas");
+      }
+    }
+
     const evaluation = await prisma.evaluation.update({
       where: { id },
       data: {
@@ -333,11 +368,22 @@ export async function updateEvaluation(id: string, patientId: string, episodeId:
       },
     });
 
+    if (validated.type === "DISCHARGE") {
+      await prisma.careEpisode.update({
+        where: { id: episodeId },
+        data: {
+          status: CareEpisodeStatus.DISCHARGED,
+          endDate: new Date(),
+        },
+      });
+    }
+
     revalidatePath(`/dashboard/patients/${patientId}/history`);
     return evaluation;
-  } catch (error) {
+  } catch (error: any) {
+
     console.error("[updateEvaluation] Error:", error);
-    throw new Error("Error al actualizar evaluación");
+    throw new Error(error?.message || "Error al actualizar evaluación");
   }
 }
 
@@ -380,9 +426,10 @@ export async function deleteEvaluation(id: string, patientId: string, episodeId:
 
     revalidatePath(`/dashboard/patients/${patientId}/history`);
     return true;
-  } catch (error) {
+  } catch (error: any) {
+
     console.error("[deleteEvaluation] Error:", error);
-    throw new Error("Error al eliminar evaluación");
+    throw new Error(error?.message || "Error al eliminar evaluación");
   }
 }
 
@@ -404,9 +451,10 @@ export async function getSessions(patientId: string, episodeId?: string) {
     });
 
     return sessions;
-  } catch (error) {
+  } catch (error: any) {
+
     console.error("[getSessions] Error:", error);
-    throw new Error("Error al obtener sesiones");
+    throw new Error(error?.message || "Error al obtener sesiones");
   }
 }
 
@@ -418,6 +466,14 @@ export async function createSession(patientId: string, episodeId: string, data: 
 
     if (episode.status === CareEpisodeStatus.DISCHARGED) {
       throw new Error("No se pueden registrar sesiones en un episodio dado de alta");
+    }
+
+    const workflow = await getEpisodeWorkflowSummary(episodeId, patientId);
+    if (!workflow.hasInitialEvaluation) {
+      throw new Error("Debe registrar una evaluación inicial antes de registrar sesiones");
+    }
+    if (!workflow.hasPlan) {
+      throw new Error("Debe definir el plan terapéutico en el episodio antes de registrar sesiones");
     }
 
     const validated = sessionEvolutionSchema.parse(data);
@@ -466,9 +522,10 @@ export async function createSession(patientId: string, episodeId: string, data: 
 
     revalidatePath(`/dashboard/patients/${patientId}/history`);
     return session;
-  } catch (error) {
+  } catch (error: any) {
+
     console.error("[createSession] Error:", error);
-    throw new Error("Error al crear sesión");
+    throw new Error(error?.message || "Error al crear sesión");
   }
 }
 
@@ -508,6 +565,14 @@ export async function updateSession(id: string, patientId: string, episodeId: st
 
     if (episode.status === CareEpisodeStatus.DISCHARGED) {
       throw new Error("No se pueden editar sesiones en un episodio dado de alta");
+    }
+
+    const workflow = await getEpisodeWorkflowSummary(episodeId, patientId);
+    if (!workflow.hasInitialEvaluation) {
+      throw new Error("Debe registrar una evaluación inicial antes de editar sesiones");
+    }
+    if (!workflow.hasPlan) {
+      throw new Error("Debe confirmar que el episodio tenga plan terapéutico para editar sesiones");
     }
 
     const validated = sessionEvolutionSchema.parse(data);
@@ -555,9 +620,10 @@ export async function updateSession(id: string, patientId: string, episodeId: st
 
     revalidatePath(`/dashboard/patients/${patientId}/history`);
     return session;
-  } catch (error) {
+  } catch (error: any) {
+
     console.error("[updateSession] Error:", error);
-    throw new Error("Error al actualizar sesión");
+    throw new Error(error?.message || "Error al actualizar sesión");
   }
 }
 
@@ -600,8 +666,9 @@ export async function deleteSession(id: string, patientId: string, episodeId: st
 
     revalidatePath(`/dashboard/patients/${patientId}/history`);
     return true;
-  } catch (error) {
+  } catch (error: any) {
+
     console.error("[deleteSession] Error:", error);
-    throw new Error("Error al eliminar sesión");
+    throw new Error(error?.message || "Error al eliminar sesión");
   }
 }

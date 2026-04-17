@@ -4,6 +4,8 @@ import { getCurrentUserOrThrow, isAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AnalyticsClient } from "./analytics-client";
 
+export const dynamic = "force-dynamic";
+
 const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const STATUS_COLORS: Record<AppointmentStatus, string> = {
   COMPLETED: "hsl(174 65% 35%)",

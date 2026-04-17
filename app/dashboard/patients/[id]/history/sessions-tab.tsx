@@ -140,8 +140,8 @@ export function SessionsTab({ patientId, episodeId, episodeTitle, sessions }: Se
                     className="group hover:shadow-xl transition-all duration-300 cursor-pointer relative overflow-hidden border-l-4 hover:border-l-primary"
                     style={{
                       borderLeftColor:
-                        session.painLevel !== null
-                          ? getPainColor(session.painLevel)
+                        session.painLevel != null
+                          ? getPainColor(session.painLevel as number)
                               .replace('bg-', 'var(--')
                               .replace('500', '-500)')
                           : 'var(--border)',
@@ -150,7 +150,7 @@ export function SessionsTab({ patientId, episodeId, episodeTitle, sessions }: Se
                   >
                     {/* Color accent bar */}
                     <div
-                      className={`absolute left-0 top-0 bottom-0 w-1 ${session.painLevel !== null ? getPainColor(session.painLevel) : 'bg-muted'}`}
+                      className={`absolute left-0 top-0 bottom-0 w-1 ${session.painLevel != null ? getPainColor(session.painLevel as number) : 'bg-muted'}`}
                     />
 
                     <CardContent className="p-5 sm:p-6 pl-6 sm:pl-8">
@@ -176,9 +176,9 @@ export function SessionsTab({ patientId, episodeId, episodeTitle, sessions }: Se
                               {session.duration} min
                             </Badge>
 
-                            {session.painLevel !== null && (
+                            {session.painLevel != null && (
                               <Badge
-                                className={`${getPainBadgeColor(session.painLevel)} font-semibold`}
+                                className={`${getPainBadgeColor(session.painLevel as number)} font-semibold`}
                               >
                                 <Activity className="w-3 h-3 mr-1.5" />
                                 EVA: {session.painLevel}/10
